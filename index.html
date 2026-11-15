@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="현관 날씨">
 <meta name="theme-color" content="#eef1f5">
 <link rel="manifest" href="manifest.json">
-<script>try{var c=JSON.parse(localStorage.getItem('door.cfg')||'{}');document.documentElement.setAttribute('data-theme',c.theme==='dark'?'dark':'light');}catch(e){}</script>
+<script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('door.lastTheme')==='dark'?'dark':'light');}catch(e){}</script>
 <meta name="format-detection" content="telephone=no">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
@@ -57,6 +57,7 @@ header{display:flex;align-items:flex-end;justify-content:space-between;padding:0
 .clock b{font-size:3.5rem;font-weight:700;letter-spacing:-.03em;line-height:1}
 .gear{border:0;background:none;width:2rem;height:2rem;display:grid;place-items:center;opacity:.5;color:var(--text)}
 .gear svg{width:1.3rem;height:1.3rem}
+.gear.mode{width:auto;gap:.3rem;display:flex;align-items:center;font-size:.95rem;font-weight:600;padding:0 .2rem}
 .hint{flex:none;display:none;align-items:center;gap:.8rem;background:var(--card2);border-radius:.9rem;padding:.6rem 1rem;margin-bottom:.7rem;font-size:1rem;line-height:1.4}
 .hint.show{display:flex} .hint span{flex:1} .hint button{border:0;background:none;font-size:1rem;font-weight:700;color:var(--good);padding:.3rem .5rem;white-space:nowrap}
 
@@ -202,7 +203,7 @@ body.dim .dimmer{opacity:.72;pointer-events:auto}
 
 <header>
   <div>
-    <div class="where"><span id="where">서울</span><button class="gear" id="gear" aria-label="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button><button class="gear" id="themebtn" aria-label="화이트/다크 전환"></button></div>
+    <div class="where"><span id="where">서울</span><button class="gear" id="gear" aria-label="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button><button class="gear mode" id="themebtn" aria-label="화면 모드 전환"></button></div>
     <div class="date" id="date"></div>
   </div>
   <div class="clock"><small id="ampm"></small><b id="clock"></b></div>
@@ -250,7 +251,8 @@ body.dim .dimmer{opacity:.72;pointer-events:auto}
     </div>
     <div class="f">
       <label>화면 모드</label>
-      <div class="row"><select id="s-theme"><option value="light">화이트</option><option value="dark">다크</option></select></div>
+      <div class="row"><select id="s-theme"><option value="auto">자동 — 해가 지면 다크, 해가 뜨면 화이트</option><option value="light">항상 화이트</option><option value="dark">항상 다크</option></select></div>
+      <div class="hint" id="s-sun"></div>
     </div>
     <div class="f">
       <label>뉴스</label>
@@ -289,7 +291,7 @@ var FEEDS = {
   economy:  {label:'Google 뉴스 · 경제',       url:'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko'},
   custom:   {label:'직접 입력한 RSS',          url:''}
 };
-var DEFAULTS = {name:'서울', lat:37.5665, lon:126.9780, feed:'google', custom:'', dim:1, back:120, theme:'light'};
+var DEFAULTS = {name:'서울', lat:37.5665, lon:126.9780, feed:'google', custom:'', dim:1, back:120, mode:'auto'};
 
 var store = {
   get:function(k,d){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
@@ -301,14 +303,41 @@ var $ = function(id){ return document.getElementById(id); };
 var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
 var locKey = function(){ return cfg.lat.toFixed(3)+','+cfg.lon.toFixed(3); };
 
-/* ================= 화면 모드 (화이트 / 다크) ================= */
+/* ================= 화면 모드 (자동 / 화이트 / 다크) ================= */
 var ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 var ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+var ICON_AUTO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>';
+var MODE_LABEL = {auto:'자동', light:'화이트', dark:'다크'};
+function mode(){ return MODE_LABEL[cfg.mode] ? cfg.mode : 'auto'; }
+
+// 설정된 위치의 그날 일출·일몰 시각 (천문 계산식, 인터넷 연결과 무관하게 동작)
+function sunTimes(date, lat, lon){
+  var rad=Math.PI/180;
+  var n = Math.floor(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000) + 2440588 - 2451545;   // 2000-01-01 정오 기준 날짜 수
+  var js = n - lon/360;
+  var M = (357.5291 + 0.98560028*js) % 360;
+  var C = 1.9148*Math.sin(M*rad) + 0.02*Math.sin(2*M*rad) + 0.0003*Math.sin(3*M*rad);
+  var L = (M + C + 180 + 102.9372) % 360;
+  var transit = 2451545 + js + 0.0053*Math.sin(M*rad) - 0.0069*Math.sin(2*L*rad);
+  var sinD = Math.sin(L*rad)*Math.sin(23.4397*rad), cosD = Math.cos(Math.asin(sinD));
+  var cosW = (Math.sin(-0.833*rad) - Math.sin(lat*rad)*sinD) / (Math.cos(lat*rad)*cosD);
+  if(cosW > 1) return {polar:'night'};          // 해가 뜨지 않는 날
+  if(cosW < -1) return {polar:'day'};           // 해가 지지 않는 날
+  var w = Math.acos(cosW)/rad, toMs = function(j){ return (j - 2440587.5)*86400000; };
+  return {rise:toMs(transit - w/360), set:toMs(transit + w/360)};
+}
+function isNight(now){
+  var t = sunTimes(new Date(now), cfg.lat, cfg.lon);
+  if(t.polar) return t.polar==='night';
+  return now < t.rise || now >= t.set;
+}
 function applyTheme(){
-  var dark = cfg.theme==='dark';
-  document.documentElement.setAttribute('data-theme', dark?'dark':'light');
-  var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', dark?'#0a0e13':'#eef1f5');
-  var b=$('themebtn'); if(b) b.innerHTML = dark ? ICON_SUN : ICON_MOON;      // 누르면 바뀔 모드를 아이콘으로 표시
+  var m = mode(), dark = m==='dark' || (m==='auto' && isNight(Date.now()));
+  if(document.documentElement.getAttribute('data-theme') !== (dark?'dark':'light')) document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+  var meta=document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute('content', dark?'#0a0e13':'#eef1f5');
+  var b=$('themebtn'), html=(m==='auto'?ICON_AUTO:m==='dark'?ICON_MOON:ICON_SUN)+'<span>'+MODE_LABEL[m]+'</span>';
+  if(b && b.getAttribute('data-m')!==m){ b.innerHTML=html; b.setAttribute('data-m',m); }    // 현재 모드를 표시, 누르면 다음 모드로
+  try{ localStorage.setItem('door.lastTheme', dark?'dark':'light'); }catch(e){}
 }
 
 var SAFE = {};
@@ -645,7 +674,7 @@ function tick(){
     $('ampm').textContent = h<12?'오전':'오후';
     $('clock').textContent = ((h%12)||12)+':'+(m<10?'0':'')+m;
     $('date').textContent = (d.getMonth()+1)+'월 '+d.getDate()+'일 '+['일','월','화','수','목','금','토'][d.getDay()]+'요일';
-    refresh(); renderStatus();
+    refresh(); renderStatus(); applyTheme();
     if(m%10===0){ SAFE.renderWeather(); SAFE.renderDust(); SAFE.renderTips(); SAFE.renderNews(); }      // 시간 흐름 반영(지나간 예보 정리)
     // 하루 한 번(새벽 4시대) 페이지 새로 고침: 오래 켜 둔 화면 정리
     if(h===4 && Date.now()-loadedAt>6*3600000 && navigator.onLine!==false) location.reload();
@@ -680,11 +709,13 @@ function openSettings(){
   var ps=$('s-preset'); ps.innerHTML='<option value="">— 지역 선택 —</option>'+PRESETS.map(function(p,i){ return '<option value="'+i+'">'+p[0]+'</option>'; }).join('');
   var fs=$('s-feed'); fs.innerHTML=Object.keys(FEEDS).map(function(k){ return '<option value="'+k+'">'+FEEDS[k].label+'</option>'; }).join('');
   $('s-name').value=cfg.name; $('s-lat').value=cfg.lat; $('s-lon').value=cfg.lon; fs.value=cfg.feed; $('s-custom').value=cfg.custom;
-  $('s-dim').value=cfg.dim?'1':'0'; $('s-back').value=String(cfg.back); $('s-theme').value=cfg.theme==='dark'?'dark':'light';
+  $('s-dim').value=cfg.dim?'1':'0'; $('s-back').value=String(cfg.back); $('s-theme').value=mode();
+  var st=sunTimes(new Date(), cfg.lat, cfg.lon);
+  $('s-sun').textContent = st.polar ? '' : '오늘 '+cfg.name+' 일출 '+clockText(new Date(st.rise))+' · 일몰 '+clockText(new Date(st.set));
   $('sheet').classList.add('open');
 }
 $('gear').addEventListener('click', openSettings);
-$('themebtn').addEventListener('click', function(){ cfg.theme = cfg.theme==='dark'?'light':'dark'; store.set('door.cfg',cfg); applyTheme(); });
+$('themebtn').addEventListener('click', function(){ var order=['auto','light','dark']; cfg.mode = order[(order.indexOf(mode())+1)%3]; store.set('door.cfg',cfg); applyTheme(); });
 $('s-cancel').addEventListener('click', function(){ $('sheet').classList.remove('open'); });
 $('s-preset').addEventListener('change', function(){ var p=PRESETS[this.value]; if(!p) return; $('s-name').value=p[0]; $('s-lat').value=p[1]; $('s-lon').value=p[2]; });
 $('s-custom').addEventListener('input', function(){ if(this.value.trim()) $('s-feed').value='custom'; });
@@ -703,7 +734,7 @@ $('s-save').addEventListener('click', function(){
   if(!(lat>=-90&&lat<=90&&lon>=-180&&lon<=180)){ $('s-geomsg').textContent='위도·경도 값을 확인해 주세요. (예: 37.5665 / 126.9780)'; return; }
   cfg.name=$('s-name').value.trim()||'우리 집'; cfg.lat=lat; cfg.lon=lon;
   cfg.feed=$('s-feed').value; cfg.custom=$('s-custom').value.trim();
-  cfg.dim=$('s-dim').value==='1'?1:0; cfg.back=parseInt($('s-back').value,10)||0; cfg.theme=$('s-theme').value==='dark'?'dark':'light';
+  cfg.dim=$('s-dim').value==='1'?1:0; cfg.back=parseInt($('s-back').value,10)||0; cfg.mode=MODE_LABEL[$('s-theme').value]?$('s-theme').value:'auto';
   store.set('door.cfg',cfg); applyTheme();
   $('sheet').classList.remove('open');
   $('where').textContent=cfg.name;
