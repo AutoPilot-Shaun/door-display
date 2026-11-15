@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="현관 날씨">
 <meta name="theme-color" content="#0a0e13">
 <meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon.png">
 <style>
 :root{
   --bg:#0a0e13; --card:#141b24; --card2:#1a2330; --line:#243040;
@@ -280,16 +282,16 @@ var SAFE = {};
 
 /* ================= 네트워크 ================= */
 function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
-async function get(url, asText){
-  var err;
-  for (var i=0;i<3;i++){
-    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, 12000);
+async function get(url, asText, opt){
+  var err, tries=(opt&&opt.tries)||3, limit=(opt&&opt.timeout)||12000;
+  for (var i=0;i<tries;i++){
+    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, limit);
     try{
       var r = await fetch(url, {signal:ctl.signal, cache:'no-store'});
       clearTimeout(t);
       if(!r.ok) throw new Error('HTTP '+r.status);
       return asText ? await r.text() : await r.json();
-    }catch(e){ clearTimeout(t); err=e; if(i<2) await sleep(1500*(i+1)); }
+    }catch(e){ clearTimeout(t); err=e; if(i<tries-1) await sleep(1500*(i+1)); }
   }
   throw err;
 }
@@ -411,9 +413,9 @@ function renderTips(ctx){
   if(ctx){
     var hr=ctx.hr, wetAt=-1, popMax=0;
     for(var i=ctx.i0-1;i<Math.min(ctx.i0+12,hr.time.length);i++){ if(i<0) continue;
-      var pp=hr.precipitation_probability[i]||0, kind=wmo(hr.weather_code[i])[1];
+      var raw=hr.precipitation_probability[i], pp=raw||0, kind=wmo(hr.weather_code[i])[1], wetKind=WET[kind]||kind==='snow';
       if(pp>popMax) popMax=pp;
-      if(wetAt<0 && (pp>=60 || (WET[kind] && pp>=40))) wetAt=i;
+      if(wetAt<0 && (raw==null ? wetKind : (pp>=60 || (wetKind && pp>=40)))) wetAt=i;
     }
     var snowy = wetAt>=0 && wmo(hr.weather_code[wetAt])[1]==='snow';
     if(WET[wmo(ctx.cur.weather_code)[1]] || ctx.cur.precipitation>0) tips.push(['info','지금 비가 와요 · 우산 챙기세요']);
@@ -471,16 +473,70 @@ function renderNews(){
 /* ================= 불러오기 ================= */
 async function loadWeather(){
   var key=locKey(), q='latitude='+cfg.lat+'&longitude='+cfg.lon+'&timezone=auto';
-  var jobs = [
-    get('https://api.open-meteo.com/v1/forecast?'+q+'&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&hourly=temperature_2m,precipitation_probability,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=6&wind_speed_unit=ms')
-      .then(function(d){ if(!d.current||typeof d.current.temperature_2m!=='number'||!d.hourly||!Array.isArray(d.hourly.temperature_2m)||!d.daily||!Array.isArray(d.daily.temperature_2m_max)) throw new Error('shape'); put('wx',d,key); }),
-    get('https://air-quality-api.open-meteo.com/v1/air-quality?'+q+'&current=pm10,pm2_5&hourly=pm10,pm2_5&forecast_days=2')
-      .then(function(d){ if(!d.current||!('pm10' in d.current)||!d.hourly||!Array.isArray(d.hourly.pm10)||!Array.isArray(d.hourly.pm2_5)) throw new Error('shape'); put('air',d,key); })
-  ];
-  var res = await Promise.allSettled(jobs);
-  SAFE.renderDust(); SAFE.renderWeather(); SAFE.renderTips(); renderStatus();
-  if(res[0].status==='rejected' && (!cache.wx || cache.wx.key!==key)) $('hero').innerHTML='<div class="empty">날씨를 불러오지 못했습니다.<br>Wi-Fi 연결을 확인해 주세요. 1분 뒤 다시 시도합니다.</div>';
-  return res.every(function(r){ return r.status==='fulfilled'; });
+  // 대기질과 날씨를 따로 받아, 먼저 도착한 것부터 화면에 표시
+  var airJob = get('https://air-quality-api.open-meteo.com/v1/air-quality?'+q+'&current=pm10,pm2_5&hourly=pm10,pm2_5&forecast_days=2')
+    .then(function(d){ if(!d.current||!('pm10' in d.current)||!d.hourly||!Array.isArray(d.hourly.pm10)||!Array.isArray(d.hourly.pm2_5)) throw new Error('shape'); put('air',d,key); return true; })
+    .catch(function(){ return false; })
+    .then(function(ok){ SAFE.renderDust(); SAFE.renderTips(); return ok; });
+  var wxJob = get('https://api.open-meteo.com/v1/forecast?'+q+'&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&hourly=temperature_2m,precipitation_probability,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=6&wind_speed_unit=ms', false, {tries:2, timeout:8000})
+    .then(function(d){ if(!d.current||typeof d.current.temperature_2m!=='number'||!d.hourly||!Array.isArray(d.hourly.temperature_2m)||!d.daily||!Array.isArray(d.daily.temperature_2m_max)) throw new Error('shape'); d.source='open-meteo'; put('wx',d,key); return true; })
+    .catch(function(){
+      // 예비 출처: 노르웨이 기상청(MET Norway). Open-Meteo 예보 서버에 연결되지 않을 때만 사용
+      return get('https://api.met.no/weatherapi/locationforecast/2.0/complete?lat='+cfg.lat.toFixed(4)+'&lon='+cfg.lon.toFixed(4), false, {tries:2, timeout:10000})
+        .then(function(j){ put('wx', fromMetNo(j), key); return true; });
+    })
+    .catch(function(){ return false; })
+    .then(function(ok){ SAFE.renderWeather(); SAFE.renderTips(); renderStatus(); return ok; });
+  var res = await Promise.all([wxJob, airJob]);
+  if(!res[0] && (!cache.wx || cache.wx.key!==key)) $('hero').innerHTML='<div class="empty">날씨를 불러오지 못했습니다.<br>Wi-Fi 연결을 확인해 주세요. 1분 뒤 다시 시도합니다.</div>';
+  return res[0] && res[1];
+}
+
+/* MET Norway 응답을 이 화면이 쓰는 형식으로 변환 */
+function metCode(sym){
+  var s=String(sym||'').split('_')[0];
+  if(/thunder/.test(s)) return 95;
+  if(/sleet/.test(s)) return 66;
+  if(/snow/.test(s)) return /heavy/.test(s)?75:/light/.test(s)?71:73;
+  if(/rainshowers/.test(s)) return /heavy/.test(s)?82:80;
+  if(/rain/.test(s)) return /heavy/.test(s)?65:/light/.test(s)?61:63;
+  if(s==='fog') return 45; if(s==='cloudy') return 3; if(s==='partlycloudy') return 2; if(s==='fair') return 1;
+  return 0;
+}
+function feelsLike(t, rh, ws){ var e = rh/100*6.105*Math.exp(17.27*t/(237.7+t)); return t + 0.33*e - 0.70*ws - 4.0; }
+function fromMetNo(j){
+  var ts=j.properties.timeseries; if(!ts||!ts.length) throw new Error('shape');
+  var p2=function(n){ return (n<10?'0':'')+n; };
+  var isDay=function(sym,dt){ return /_night$/.test(sym)?0 : /_(day|polartwilight)$/.test(sym)?1 : (dt.getHours()>=7&&dt.getHours()<18?1:0); };
+  var H={time:[],temperature_2m:[],precipitation_probability:[],weather_code:[],is_day:[]}, days={}, order=[];
+  ts.forEach(function(x){
+    var dt=new Date(x.time), dkey=dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate()), det=x.data.instant.details;
+    var blk=x.data.next_1_hours||x.data.next_6_hours, sym=(blk&&blk.summary&&blk.summary.symbol_code)||'';
+    var d=days[dkey]; if(!d){ d=days[dkey]={min:Infinity,max:-Infinity,codes:[],any:null}; order.push(dkey); }
+    var lo=det.air_temperature, hi=det.air_temperature, six=x.data.next_6_hours&&x.data.next_6_hours.details;
+    if(!x.data.next_1_hours && six && typeof six.air_temperature_min==='number'){ lo=Math.min(lo,six.air_temperature_min); hi=Math.max(hi,six.air_temperature_max); }
+    d.min=Math.min(d.min,lo); d.max=Math.max(d.max,hi);
+    if(sym){ var code=metCode(sym); if(d.any==null) d.any=code; if(dt.getHours()>=6&&dt.getHours()<=21) d.codes.push(code); }
+    if(x.data.next_1_hours){ H.time.push(dkey+'T'+p2(dt.getHours())+':00'); H.temperature_2m.push(det.air_temperature); H.precipitation_probability.push(null); H.weather_code.push(metCode(sym)); H.is_day.push(isDay(sym,dt)); }
+  });
+  if(H.time.length<8) throw new Error('shape');
+  var sev=function(c){ return c>=95?9 : (c>=71&&c<=77)?8 : c===66?7 : (c===65||c===82)?6 : (c===63||c===80)?5 : c===61?4 : 0; };
+  var dayCode=function(d){
+    var list=d.codes.length?d.codes:(d.any==null?[3]:[d.any]), worst=list[0], cnt={}, best=list[0];
+    list.forEach(function(c){ if(sev(c)>sev(worst)) worst=c; cnt[c]=(cnt[c]||0)+1; if(cnt[c]>cnt[best]) best=c; });
+    return sev(worst)>0 ? worst : best;      // 비·눈 소식이 있으면 그것을, 없으면 가장 잦은 하늘 상태를
+  };
+  var c=ts[0], cd=c.data.instant.details, cb=c.data.next_1_hours||c.data.next_6_hours||{}, csym=(cb.summary&&cb.summary.symbol_code)||'';
+  return {
+    source:'metno', utc_offset_seconds:-new Date().getTimezoneOffset()*60,
+    current:{ time:H.time[0], temperature_2m:cd.air_temperature, relative_humidity_2m:cd.relative_humidity,
+      apparent_temperature: typeof cd.apparent_air_temperature==='number' ? cd.apparent_air_temperature : feelsLike(cd.air_temperature, cd.relative_humidity, cd.wind_speed),
+      precipitation:(cb.details&&cb.details.precipitation_amount)||0, weather_code:metCode(csym), wind_speed_10m:cd.wind_speed, is_day:isDay(csym,new Date()) },
+    hourly:H,
+    daily:{ time:order, weather_code:order.map(function(k){ return dayCode(days[k]); }),
+      temperature_2m_max:order.map(function(k){ return days[k].max; }), temperature_2m_min:order.map(function(k){ return days[k].min; }),
+      precipitation_probability_max:order.map(function(){ return null; }) }
+  };
 }
 async function loadFx(){
   var names=['USD','JPY','EUR','CNY'], mult={USD:1,JPY:100,EUR:1,CNY:1};
@@ -567,6 +623,7 @@ function tick(){
 }
 function renderStatus(){
   var c=cache.wx, el=$('upd');
+  $('src').textContent = '날씨 '+(c&&c.key===locKey()&&c.data.source==='metno' ? 'MET Norway(예비)' : 'Open-Meteo')+' · 대기질 Open-Meteo · 환율 Frankfurter';
   if(!c || c.key!==locKey()){ el.textContent=''; return; }
   var stale = Date.now()-c.at > 35*60000;
   el.className = 'upd'+(stale?' stale':'');
