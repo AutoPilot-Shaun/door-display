@@ -100,6 +100,8 @@ header{display:flex;align-items:flex-end;justify-content:space-between;padding:0
 .pm .grade{font-size:4.4rem;font-weight:800;letter-spacing:-.04em;line-height:1.05}
 .pm .next{font-size:1.05rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pm .grade.long{font-size:4rem}
+.pm .who{font-size:1.05rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm .who.over{color:var(--text);font-weight:700}
 .bar{position:relative;height:.6rem;border-radius:.3rem;display:grid;grid-template-columns:repeat(4,1fr);gap:.2rem;margin:.3rem 0 .15rem}
 .bar s{border-radius:.3rem;opacity:.38}
 .bar s:nth-child(1){background:var(--good)} .bar s:nth-child(2){background:var(--normal)} .bar s:nth-child(3){background:var(--bad)} .bar s:nth-child(4){background:var(--worst)}
@@ -163,7 +165,7 @@ footer .upd.stale{color:var(--bad);font-weight:600}
   .temp{font-size:6.6rem} .temp sup{font-size:3rem;top:.5rem}
   .cond{font-size:1.7rem}
   .stats{min-width:9.5rem;gap:.6rem} .stat b{font-size:1.3rem}
-  .pm{padding:1rem 1.15rem} .pm .grade{font-size:3.3rem} .pm .grade.long{font-size:2.7rem} .pm .name small,.pm .next .lg{display:none}
+  .pm{padding:1rem 1.15rem} .pm .grade{font-size:3.3rem} .pm .grade.long{font-size:2.7rem} .pm .name small,.pm .next .lg,.pm .who .lg{display:none}
   .pm .val{font-size:1rem} .pm .val b{font-size:1.7rem}
   .hourly{grid-template-columns:repeat(6,1fr)} .h:nth-child(n+7){display:none}
   .daily{grid-template-columns:1fr;grid-auto-rows:1fr;padding:.5rem 1.4rem}
@@ -250,9 +252,14 @@ body.dim .dimmer{opacity:.72;pointer-events:auto}
       <div class="row"><input type="text" id="s-name" placeholder="우리 집"><input type="number" id="s-lat" step="0.0001" placeholder="위도"><input type="number" id="s-lon" step="0.0001" placeholder="경도"></div>
     </div>
     <div class="f">
-      <label>기상청 인증키 (공공데이터포털 · 기상청 단기예보 조회서비스)</label>
+      <label>공공데이터포털 인증키 (기상청 · 에어코리아 공용)</label>
       <div class="row"><input type="text" id="s-kma" placeholder="인증키 붙여넣기 · 비워 두면 해외 예보 모델 사용" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"></div>
       <div class="hint" id="s-kmamsg"></div>
+    </div>
+    <div class="f">
+      <label>미세먼지 측정소 (에어코리아 실측)</label>
+      <div class="row"><select id="s-sido"></select><select id="s-station"><option value="">— 측정소 —</option></select></div>
+      <div class="hint" id="s-airmsg"></div>
     </div>
     <div class="f">
       <label>화면 모드</label>
@@ -296,7 +303,7 @@ var FEEDS = {
   economy:  {label:'Google 뉴스 · 경제',       url:'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko'},
   custom:   {label:'직접 입력한 RSS',          url:''}
 };
-var DEFAULTS = {name:'서울', lat:37.5665, lon:126.9780, feed:'google', custom:'', dim:1, back:120, mode:'auto', kmaKey:''};
+var DEFAULTS = {name:'서울', lat:37.5665, lon:126.9780, feed:'google', custom:'', dim:1, back:120, mode:'auto', kmaKey:'', sido:'', station:''};
 
 var store = {
   get:function(k,d){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
@@ -454,25 +461,39 @@ function placeNow(d){ var off = (d && typeof d.utc_offset_seconds==='number') ? 
 function localIso(dt){ var p=function(n){return (n<10?'0':'')+n;}; return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate())+'T'+p(dt.getHours())+':'+p(dt.getMinutes()); }
 
 /* ================= 그리기: 미세먼지 ================= */
-var worstDust = -1;
+var worstDust = -1, whoOver = false;
+var WHO_LIMIT = {pm10:45, pm25:15};          // WHO 2021 권고(24시간 평균, µg/m³)
+function mean24(arr, i0){ var sum=0, n=0; for(var i=Math.max(0,i0-23); i<=i0; i++){ if(arr[i]!=null){ sum+=arr[i]; n++; } } return n>=18 ? sum/n : null; }
 function renderDust(){
-  var c = cache.air; if(!c || c.key!==locKey()){ $('dust').innerHTML = pmCard('미세먼지','PM10',null)+pmCard('초미세먼지','PM2.5',null); worstDust=-1; return; }
-  var d=c.data, t=d.hourly.time, nowIso=placeNow(d).slice(0,13), i0=0;
-  while(i0<t.length-1 && t[i0].slice(0,13) < nowIso) i0++;
-  // 캐시가 한 시간 이상 지났으면 시간별 예보에서 지금 시각 값을 사용
-  var fresh = Date.now()-c.at < 70*60000;
-  var v10 = fresh ? d.current.pm10 : d.hourly.pm10[i0], v25 = fresh ? d.current.pm2_5 : d.hourly.pm2_5[i0];
-  var mx = function(arr){ var m=null; for(var i=i0+1;i<=Math.min(i0+12,arr.length-1);i++){ if(arr[i]!=null && (m==null||arr[i]>m)) m=arr[i]; } return m; };
-  $('dust').innerHTML = pmCard('미세먼지','PM10',v10,'pm10',mx(d.hourly.pm10)) + pmCard('초미세먼지','PM2.5',v25,'pm25',mx(d.hourly.pm2_5));
+  var c = cache.air, model = c && c.key===locKey() ? c.data : null, real = airkData();
+  var v10=null, v25=null, a10=null, a25=null, n10=null, n25=null;
+  if(model){
+    var d=model, t=d.hourly.time, nowIso=placeNow(d).slice(0,13), i0=0;
+    while(i0<t.length-1 && t[i0].slice(0,13) < nowIso) i0++;
+    // 캐시가 한 시간 이상 지났으면 시간별 예보에서 지금 시각 값을 사용
+    var fresh = Date.now()-c.at < 70*60000;
+    v10 = fresh ? d.current.pm10 : d.hourly.pm10[i0]; v25 = fresh ? d.current.pm2_5 : d.hourly.pm2_5[i0];
+    var mx = function(arr){ var m=null; for(var i=i0+1;i<=Math.min(i0+12,arr.length-1);i++){ if(arr[i]!=null && (m==null||arr[i]>m)) m=arr[i]; } return m; };
+    n10 = mx(d.hourly.pm10); n25 = mx(d.hourly.pm2_5);
+    a10 = mean24(d.hourly.pm10, i0); a25 = mean24(d.hourly.pm2_5, i0);
+  }
+  if(real){        // 측정소 실측값이 있으면 현재값과 24시간 평균은 실측으로
+    if(real.pm10!=null){ v10=real.pm10; a10=real.avg10; n10=null; }
+    if(real.pm25!=null){ v25=real.pm25; a25=real.avg25; n25=null; }
+  }
+  $('dust').innerHTML = pmCard('미세먼지','PM10',v10,'pm10',n10,a10) + pmCard('초미세먼지','PM2.5',v25,'pm25',n25,a25);
   worstDust = Math.max(v10==null?-1:grade('pm10',v10), v25==null?-1:grade('pm25',v25));
+  whoOver = (v10!=null && a10!=null && Math.round(a10)>WHO_LIMIT.pm10) || (v25!=null && a25!=null && Math.round(a25)>WHO_LIMIT.pm25);
 }
-function pmCard(name, sub, v, kind, next){
+function pmCard(name, sub, v, kind, next, avg){
   if(v==null) return '<div class="pm"><div class="top"><div class="name">'+name+'<small>'+sub+'</small></div></div><div class="grade" style="font-size:2rem">불러오는 중…</div><div></div></div>';
-  var g=grade(kind,v), ng = next==null?null:grade(kind,next);
+  var g=grade(kind,v), ng = next==null?null:grade(kind,next), lim=WHO_LIMIT[kind], over = avg!=null && Math.round(avg)>lim;
   return '<div class="pm g'+g+'"><div class="top"><div class="name">'+name+'<small>'+sub+'</small></div><div class="val"><b>'+Math.round(v)+'</b>µg/m³</div></div>'+
     '<div class="grade'+(g===3?' long':'')+'">'+GRADE[g]+'</div>'+
     '<div><div class="bar"><s></s><s></s><s></s><s></s><em style="left:'+barPos(kind,v).toFixed(1)+'%"></em></div>'+
-    '<div class="next">'+(ng==null?'&nbsp;':'<span class="lg">앞으로 </span>12시간 최고 '+Math.round(next)+' · '+GRADE[ng])+'</div></div></div>';
+    (ng==null ? (avg==null?'<div class="next">&nbsp;</div>':'') : '<div class="next"><span class="lg">앞으로 </span>12시간 최고 <span class="lg">예보 </span>'+Math.round(next)+' · '+GRADE[ng]+'</div>')+
+    (avg==null?'':'<div class="who'+(over?' over':'')+'"><span class="lg">24시간 </span>평균 '+Math.round(avg)+' · WHO <span class="lg">권고('+lim+') </span>'+(over?'초과':'이내')+'</div>')+
+    '</div></div>';
 }
 
 /* ================= 그리기: 외출 한마디 ================= */
@@ -500,6 +521,7 @@ function renderTips(ctx){
   }
   if(worstDust>=3) tips.unshift(['alert','미세먼지 매우나쁨 · 마스크 꼭 쓰세요']);
   else if(worstDust===2) tips.unshift(['warn','미세먼지 나쁨 · 마스크 챙기세요']);
+  else if(whoOver) tips.push(['info','미세먼지 WHO 권고 초과 · 민감하면 마스크']);
   if(!tips.length && ctx && worstDust>=0) tips.push(['','외출하기 좋은 날이에요']);
   $('tips').innerHTML = tips.slice(0,3).map(function(t){ return '<div class="tip '+t[0]+'"><i></i>'+t[1]+'</div>'; }).join('');
 }
@@ -545,7 +567,7 @@ function renderNews(){
 async function loadWeather(){
   var key=locKey(), q='latitude='+cfg.lat+'&longitude='+cfg.lon+'&timezone=auto';
   // 대기질과 날씨를 따로 받아, 먼저 도착한 것부터 화면에 표시
-  var airJob = get('https://air-quality-api.open-meteo.com/v1/air-quality?'+q+'&current=pm10,pm2_5&hourly=pm10,pm2_5&forecast_days=2')
+  var airJob = get('https://air-quality-api.open-meteo.com/v1/air-quality?'+q+'&current=pm10,pm2_5&hourly=pm10,pm2_5&forecast_days=2&past_days=1')
     .then(function(d){ if(!d.current||!('pm10' in d.current)||!d.hourly||!Array.isArray(d.hourly.pm10)||!Array.isArray(d.hourly.pm2_5)) throw new Error('shape'); put('air',d,key); return true; })
     .catch(function(){ return false; })
     .then(function(ok){ SAFE.renderDust(); SAFE.renderTips(); return ok; });
@@ -563,6 +585,12 @@ async function loadWeather(){
       : modelWx())
     .catch(function(){ return false; })
     .then(function(ok){ SAFE.renderWeather(); SAFE.renderTips(); renderStatus(); return ok; });
+  // 에어코리아 측정소 실측(20분 간격). 실패해도 위의 모델 값으로 계속 표시된다
+  if(useAirk() && airkDue()){
+    loadAirk().then(function(d){ put('airk', d, airkId()); airkState.msg='에어코리아 연결됨 · '+d.station+' 측정소 '+d.label+' 측정값'; })
+      .catch(function(e){ airkState.msg=airkErrMsg(e); })
+      .then(function(){ SAFE.renderDust(); SAFE.renderTips(); renderStatus(); });
+  }
   var res = await Promise.all([wxJob, airJob]);
   if(!res[0] && (!cache.wx || cache.wx.key!==key)) $('hero').innerHTML='<div class="empty">날씨를 불러오지 못했습니다.<br>Wi-Fi 연결을 확인해 주세요. 1분 뒤 다시 시도합니다.</div>';
   return res[0] && res[1];
@@ -577,7 +605,7 @@ function kmaKeyVal(){ return String(cfg.kmaKey||'').replace(/\s+/g,''); }
 function useKma(){ return !!kmaKeyVal() && cfg.lat>=32.5 && cfg.lat<=39.5 && cfg.lon>=124 && cfg.lon<=132; }
 function showKmaMsg(){
   var el=$('s-kmamsg'); if(!el) return;
-  el.textContent = !kmaKeyVal() ? '공공데이터포털(data.go.kr)에서 발급한 일반 인증키를 넣으면 현재 날씨를 기상청 실황(관측)으로 표시합니다. 키는 이 기기에만 저장됩니다.'
+  el.textContent = !kmaKeyVal() ? '공공데이터포털(data.go.kr)에서 발급한 일반 인증키를 넣으면 날씨는 기상청 실황(관측), 미세먼지는 에어코리아 측정값으로 표시합니다. 키는 이 기기에만 저장됩니다.'
     : !useKma() ? '기상청 자료는 국내 지역에서만 쓸 수 있어 해외 예보 모델로 표시합니다.'
     : (kmaState.msg || '저장하면 기상청 연결을 확인합니다.');
 }
@@ -727,6 +755,71 @@ function buildKma(ncst, ultra, vf, day, now){
   };
 }
 
+/* ================= 에어코리아 (공공데이터포털 · 한국환경공단 대기오염정보) =================
+   설정에서 고른 측정소의 실측값. 인증키는 기상청과 같은 키를 쓴다. */
+var AIRK_BASE = 'https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/';
+var airkState = {msg:''};
+var SIDO = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+var SIDO_CITY = {'경기':'수원 성남 고양 용인 부천 안산 안양 남양주 화성 평택 의정부 파주 김포 광명 하남','강원':'춘천 원주 강릉','충북':'청주 충주','충남':'천안 아산','전북':'전주 군산 익산','전남':'목포 여수 순천','경북':'포항 경주 구미 안동','경남':'창원 진주 김해 양산 거제','제주':'서귀포'};
+function guessSido(lat, lon){            // 지역 목록에서 가장 가까운 도시가 속한 시도
+  var best=null, bd=1e9; PRESETS.forEach(function(p){ var d=(p[1]-lat)*(p[1]-lat)+(p[2]-lon)*(p[2]-lon); if(d<bd){ bd=d; best=p[0]; } });
+  var city=String(best||'').split(' ')[0]; if(SIDO.indexOf(city)>=0) return city;
+  for(var k in SIDO_CITY){ if((' '+SIDO_CITY[k]+' ').indexOf(' '+city+' ')>=0) return k; }
+  return '';
+}
+function airkId(){ return (cfg.sido||'')+'/'+(cfg.station||''); }
+function useAirk(){ return !!kmaKeyVal() && !!cfg.station; }
+function airkDue(){ var c=cache.airk; return !c || c.key!==airkId() || Date.now()-c.at > 19*60000; }
+function airkData(){                      // 3시간 이내의 실측값만 사용
+  var c=cache.airk; if(!useAirk() || !c || c.key!==airkId() || !c.data) return null;
+  return Date.now()-c.data.ts < 3.5*H1 ? c.data : null;
+}
+function airkErrMsg(e){
+  var k=e&&e.kma;
+  return k==='key' ? '인증키가 맞지 않거나 에어코리아 활용신청이 아직 반영되지 않았습니다. 지금은 예측 모델 값으로 표시합니다.'
+    : k==='quota' ? '에어코리아 하루 호출 한도를 넘었습니다. 지금은 예측 모델 값으로 표시합니다.'
+    : k==='nodata' ? '이 측정소의 최근 측정값이 없습니다. 지금은 예측 모델 값으로 표시합니다.'
+    : '에어코리아에서 자료를 받지 못했습니다. 지금은 예측 모델 값으로 표시하고 다음 갱신 때 다시 시도합니다.';
+}
+async function airkCall(op, params, keyOverride){
+  var key=String(keyOverride!=null?keyOverride:kmaKeyVal()).replace(/\s+/g,'');
+  var url=AIRK_BASE+op+'?serviceKey='+(key.indexOf('%')>=0?key:encodeURIComponent(key))+'&returnType=json&pageNo=1&'+params;
+  var ctl=new AbortController(), tm=setTimeout(function(){ ctl.abort(); }, 12000), r, text;
+  try{ r=await fetch(url,{signal:ctl.signal, cache:'no-store'}); text=await r.text(); }
+  catch(e){ throw kmaErr('net'); }
+  finally{ clearTimeout(tm); }
+  var j=null; try{ j=JSON.parse(text); }catch(e){}
+  var head=j&&j.response&&j.response.header, code=head?String(head.resultCode):'';
+  if(code==='00' && j.response.body) return [].concat(j.response.body.items||[]);
+  if(code==='03') throw kmaErr('nodata');
+  if(code==='22' || /LIMITED_NUMBER/.test(text)) throw kmaErr('quota');
+  if(code==='20'||code==='30'||code==='31'||code==='32'||code==='33' || r.status===401 || r.status===403 || /SERVICE[_ ]KEY|SERVICE[_ ]ACCESS[_ ]DENIED|접근거부|DEADLINE_HAS_EXPIRED|UNREGISTERED_IP/.test(text)) throw kmaErr('key');
+  throw kmaErr('net', 'HTTP '+r.status+' '+code);
+}
+function airkNum(v){ var n=parseFloat(v); return (isNaN(n)||n<0) ? null : n; }
+function airkTime(str){                   // 'YYYY-MM-DD HH:MM' (자정은 24:00으로 온다) → 시각(ms)
+  var m=/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})/.exec(String(str||'')); if(!m) return 0;
+  return Date.parse(m[1]+'T00:00:00+09:00') + (+m[2])*H1 + (+m[3])*60000;
+}
+async function loadAirk(){
+  var station=cfg.station;
+  var items=await airkCall('getMsrstnAcctoRltmMesureDnsty', 'numOfRows=30&dataTerm=DAILY&ver=1.3&stationName='+encodeURIComponent(station));
+  items=items.map(function(it){ return {ts:airkTime(it.dataTime), pm10:airkNum(it.pm10Value), pm25:airkNum(it.pm25Value), p10:airkNum(it.pm10Value24), p25:airkNum(it.pm25Value24)}; })
+             .filter(function(x){ return x.ts>0; }).sort(function(a,b){ return b.ts-a.ts; });
+  if(!items.length) throw kmaErr('nodata');
+  var latest=items[0].ts, recent=items.filter(function(x){ return latest-x.ts < 3*H1; });       // 점검 등으로 비면 직전 1~2시간 값
+  var pick=function(k){ for(var i=0;i<recent.length;i++){ if(recent[i][k]!=null) return recent[i]; } return null; };
+  var i10=pick('pm10'), i25=pick('pm25');
+  if(!i10 && !i25) throw kmaErr('nodata');
+  var day=items.filter(function(x){ return latest-x.ts < 24*H1; });
+  var avg=function(k, fallback){ var v=day.map(function(x){ return x[k]; }).filter(function(n){ return n!=null; }); return v.length>=18 ? v.reduce(function(a,b){ return a+b; },0)/v.length : fallback; };
+  var ts=(i25||i10).ts, d=new Date(ts+9*H1);
+  if(Date.now()-ts > 3.5*H1) throw kmaErr('nodata');
+  return {station:station, ts:ts, label:p2(d.getUTCHours())+':'+p2(d.getUTCMinutes()),
+    pm10:i10?i10.pm10:null, pm25:i25?i25.pm25:null,
+    avg10:avg('pm10', items[0].p10), avg25:avg('pm25', items[0].p25)};
+}
+
 /* MET Norway 응답을 이 화면이 쓰는 형식으로 변환 */
 function metCode(sym){
   var s=String(sym||'').split('_')[0];
@@ -859,7 +952,7 @@ function tick(){
 function renderStatus(){
   var c=cache.wx, el=$('upd');
   var srcName = c&&c.key===locKey() ? c.data.source : '';
-  $('src').textContent = '날씨 '+(srcName==='kma' ? '기상청' : srcName==='metno' ? 'MET Norway(예비)' : 'Open-Meteo'+(useKma()&&srcName?'(예비)':''))+' · 대기질 Open-Meteo · 환율 Frankfurter';
+  $('src').textContent = '날씨 '+(srcName==='kma' ? '기상청' : srcName==='metno' ? 'MET Norway(예비)' : 'Open-Meteo'+(useKma()&&srcName?'(예비)':''))+' · 대기질 '+(airkData() ? '에어코리아('+cfg.station+')' : 'Open-Meteo'+(useAirk()?'(예비)':''))+' · 환율 Frankfurter';
   showKmaMsg();
   if(!c || c.key!==locKey()){ el.textContent=''; return; }
   var stale = Date.now()-c.at > 35*60000;
@@ -886,6 +979,11 @@ function openSettings(){
   $('s-name').value=cfg.name; $('s-lat').value=cfg.lat; $('s-lon').value=cfg.lon; fs.value=cfg.feed; $('s-custom').value=cfg.custom;
   $('s-dim').value=cfg.dim?'1':'0'; $('s-back').value=String(cfg.back); $('s-theme').value=mode();
   $('s-kma').value=cfg.kmaKey||''; showKmaMsg();
+  $('s-sido').innerHTML='<option value="">— 시도 —</option>'+SIDO.map(function(n){ return '<option>'+n+'</option>'; }).join('');
+  $('s-sido').value=cfg.sido||guessSido(cfg.lat,cfg.lon);
+  $('s-station').innerHTML='<option value="">— 측정소 —</option>'+(cfg.station?'<option selected>'+esc(cfg.station)+'</option>':'');
+  $('s-airmsg').textContent = !kmaKeyVal() ? '인증키를 넣은 뒤 시도를 고르면 측정소 목록이 나옵니다. 고르지 않으면 예측 모델 값으로 표시합니다.' : (cfg.station ? (airkState.msg||'') : '집에서 가까운 측정소를 고르고 저장하세요.');
+  if(kmaKeyVal() && $('s-sido').value) loadStations();
   var st=sunTimes(new Date(), cfg.lat, cfg.lon);
   $('s-sun').textContent = st.polar ? '' : '오늘 '+cfg.name+' 일출 '+clockText(new Date(st.rise))+' · 일몰 '+clockText(new Date(st.set));
   $('sheet').classList.add('open');
@@ -894,6 +992,23 @@ $('gear').addEventListener('click', openSettings);
 $('themebtn').addEventListener('click', function(){ var order=['auto','light','dark']; cfg.mode = order[(order.indexOf(mode())+1)%3]; store.set('door.cfg',cfg); applyTheme(); });
 $('s-cancel').addEventListener('click', function(){ $('sheet').classList.remove('open'); });
 $('s-preset').addEventListener('change', function(){ var p=PRESETS[this.value]; if(!p) return; $('s-name').value=p[0]; $('s-lat').value=p[1]; $('s-lon').value=p[2]; });
+var stationReq=0;
+function loadStations(){        // 고른 시도의 측정소 목록을 에어코리아에서 받아 온다 (입력 칸의 키 사용)
+  var sido=$('s-sido').value, key=$('s-kma').value.replace(/\s+/g,''), sel=$('s-station'), msg=$('s-airmsg'), keep=sel.value||cfg.station||'', my=++stationReq;
+  if(!sido){ sel.innerHTML='<option value="">— 측정소 —</option>'; return; }
+  if(!key){ msg.textContent='먼저 위 칸에 인증키를 넣어 주세요.'; return; }
+  msg.textContent='측정소 목록을 불러오는 중…';
+  airkCall('getCtprvnRltmMesureDnsty', 'numOfRows=300&ver=1.3&sidoName='+encodeURIComponent(sido), key).then(function(items){
+    if(my!==stationReq) return;
+    var seen={}, list=[]; items.forEach(function(it){ var n=String(it.stationName||''); if(n && !seen[n]){ seen[n]=1; list.push({n:n, v:airkNum(it.pm25Value)}); } });
+    list.sort(function(a,b){ return a.n.localeCompare(b.n,'ko'); });
+    sel.innerHTML='<option value="">— 측정소 —</option>'+list.map(function(x){ return '<option value="'+esc(x.n)+'">'+esc(x.n)+(x.v==null?'':' · 초미세 '+Math.round(x.v))+'</option>'; }).join('');
+    if(keep && seen[keep]) sel.value=keep;
+    msg.textContent = !list.length ? '이 시도의 측정소 목록이 비어 있습니다.' : (sel.value && sel.value===cfg.station && key===kmaKeyVal() && airkState.msg) ? airkState.msg : sido+' 측정소 '+list.length+'곳 · 집에서 가까운 곳을 고르고 저장하세요.';
+  }).catch(function(e){ if(my===stationReq) msg.textContent = e&&e.kma==='key' ? '인증키가 맞지 않거나 에어코리아 활용신청이 아직 반영되지 않았습니다(1~2시간 걸릴 수 있음).' : '측정소 목록을 받지 못했습니다. 잠시 뒤 시도를 다시 골라 주세요.'; });
+}
+$('s-sido').addEventListener('change', function(){ $('s-station').innerHTML='<option value="">— 측정소 —</option>'; loadStations(); });
+$('s-kma').addEventListener('change', function(){ if($('s-sido').value) loadStations(); });
 $('s-custom').addEventListener('input', function(){ if(this.value.trim()) $('s-feed').value='custom'; });
 $('s-geo').addEventListener('click', function(){
   var msg=$('s-geomsg');
@@ -912,7 +1027,10 @@ $('s-save').addEventListener('click', function(){
   cfg.feed=$('s-feed').value; cfg.custom=$('s-custom').value.trim();
   cfg.dim=$('s-dim').value==='1'?1:0; cfg.back=parseInt($('s-back').value,10)||0; cfg.mode=MODE_LABEL[$('s-theme').value]?$('s-theme').value:'auto';
   var newKey=$('s-kma').value.replace(/\s+/g,'');
-  if(newKey!==(cfg.kmaKey||'')){ cfg.kmaKey=newKey; kmaState.mem={}; kmaState.msg=''; }
+  if(newKey!==(cfg.kmaKey||'')){ cfg.kmaKey=newKey; kmaState.mem={}; kmaState.msg=''; airkState.msg=''; delete cache.airk; }
+  var newStation=$('s-station').value||'', newSido=$('s-sido').value||'';
+  if(newStation!==(cfg.station||'')){ airkState.msg=''; delete cache.airk; }
+  cfg.station=newStation; cfg.sido=newStation?newSido:(cfg.sido&&!newSido?'':newSido);
   store.set('door.cfg',cfg); applyTheme();
   $('sheet').classList.remove('open');
   $('where').textContent=cfg.name;
