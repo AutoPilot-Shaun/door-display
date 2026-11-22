@@ -128,6 +128,20 @@ header{display:flex;align-items:flex-end;justify-content:space-between;padding:0
 
 /* ---------- 2쪽: 환율 · 뉴스 ---------- */
 #p2{grid-template-rows:auto 1fr;grid-template-areas:"fx" "news"}
+/* ---------- 2쪽: 초미세먼지 흐름 지도 ---------- */
+#pmap{grid-template-rows:minmax(0,1fr) auto}
+.mapcard{padding:0;position:relative;background:#0b0f14}
+.mapcard iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#0b0f14}
+.mapcard.touch iframe{pointer-events:auto}
+.maphold{position:absolute;inset:0;display:grid;place-items:center;color:#9aa7b7;font-size:1.2rem;pointer-events:none}
+.mapcard.on .maphold{display:none}
+.mapbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0 .3rem;font-size:.95rem;color:var(--faint)}
+.mapbar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mapbar .btn{font-size:1rem;padding:.5rem 1rem;flex:none}
+.mapbar .btn.act{background:var(--good);color:var(--on-pri)}
+/* ---------- 당겨서 새로고침 ---------- */
+.ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-130%);background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:.6rem 1.3rem;font-size:1.05rem;font-weight:600;z-index:70;pointer-events:none;transition:transform .25s;white-space:nowrap}
+.ptr.drag{transition:none}
 .sec-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.8rem;padding:0 .3rem}
 .sec-h h2{font-size:1.6rem;font-weight:700}
 .sec-h span{font-size:.95rem;color:var(--faint)}
@@ -219,6 +233,10 @@ body.dim .dimmer{opacity:.72;pointer-events:auto}
     <div class="card hourly" id="hourly"></div>
     <div class="card daily" id="daily"></div>
   </section>
+  <section class="page" id="pmap">
+    <div class="card mapcard" id="mapcard"><iframe id="mapframe" title="초미세먼지 흐름 지도" src="about:blank" sandbox="allow-scripts allow-same-origin"></iframe><div class="maphold">지도를 불러오는 중…</div></div>
+    <div class="mapbar"><span>초미세먼지(PM2.5) 흐름 · earth.nullschool.net · 예측 모델(측정값 아님)</span><button class="btn" id="maptouch">지도 조작</button></div>
+  </section>
   <section class="page" id="p2">
     <div class="fxwrap">
       <div class="sec-h"><h2>환율</h2><span id="fxnote"></span></div>
@@ -232,12 +250,13 @@ body.dim .dimmer{opacity:.72;pointer-events:auto}
 </main>
 
 <footer>
-  <div class="src" id="src">날씨·대기질 Open-Meteo · 환율 Frankfurter</div>
-  <div class="dots" id="dots"><i class="on"></i><i></i></div>
+  <div class="src" id="src">날씨·대기질 Open-Meteo</div>
+  <div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
   <div class="upd" id="upd"></div>
 </footer>
 
 <div class="dimmer" id="dimmer"></div>
+<div class="ptr" id="ptr">아래로 당겨서 새로고침</div>
 
 <div class="sheet" id="sheet">
   <div class="panel">
@@ -276,7 +295,7 @@ body.dim .dimmer{opacity:.72;pointer-events:auto}
       <div class="row"><select id="s-dim"><option value="1">켜기 — 화면을 누르면 1분간 밝아짐</option><option value="0">끄기</option></select></div>
     </div>
     <div class="f">
-      <label>환율·뉴스 화면에서 날씨 화면으로 자동 복귀</label>
+      <label>지도·환율 화면에서 날씨 화면으로 자동 복귀</label>
       <div class="row"><select id="s-back"><option value="0">안 함</option><option value="60">1분 뒤</option><option value="120">2분 뒤</option><option value="300">5분 뒤</option></select></div>
     </div>
     <div class="acts"><button class="btn" id="s-cancel">닫기</button><button class="btn pri" id="s-save">저장</button></div>
@@ -535,20 +554,30 @@ function spark(vals, cls){
   var col = cls==='up'?'var(--up)':cls==='down'?'var(--down)':'var(--sub)', last=pts[n-1].split(',');
   return '<svg viewBox="0 0 136 64" preserveAspectRatio="none"><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="'+last[0]+'" cy="'+last[1]+'" r="3.5" fill="'+col+'"/></svg>';
 }
+// 거래일(한국 시각 기준, 새벽 3시 이전은 전날로, 주말은 금요일로)
+function tradeDay(ms){
+  var d=new Date(ms+9*3600000-3*3600000), w=d.getUTCDay();
+  if(w===6) d=new Date(d.getTime()-864e5); else if(w===0) d=new Date(d.getTime()-2*864e5);
+  return d.getUTCFullYear()+'-'+(d.getUTCMonth()<9?'0':'')+(d.getUTCMonth()+1)+'-'+(d.getUTCDate()<10?'0':'')+d.getUTCDate();
+}
+function fxLive(){ var l=cache.fxl; return l && l.data && Date.now()-l.at < 6*3600000 ? l : null; }      // 6시간 넘게 못 받으면 예비 값으로
 function renderFx(){
-  var c=cache.fx;
-  if(!c){ $('fx').innerHTML = CUR.map(function(x){ return '<div class="card cur"><div class="nm">'+x[1]+'</div><div class="rate">–</div><div class="chg">&nbsp;</div></div>'; }).join(''); return; }
-  var d=c.data;
+  var hist=cache.fx&&cache.fx.data, live=fxLive(), blank=function(x){ return '<div class="card cur"><div class="nm">'+x[1]+'</div><div class="rate">–</div><div class="chg">&nbsp;</div></div>'; };
+  if(!hist && !live){ $('fx').innerHTML = CUR.map(blank).join(''); return; }
+  var days=cache.fxd&&cache.fxd.data||{}, today=tradeDay(Date.now()), prevKey=Object.keys(days).filter(function(k){ return k<today; }).sort().pop();
   $('fx').innerHTML = CUR.map(function(x){
-    var s=d.series[x[0]]||[], v=s[s.length-1], prev=s.length>1?s[s.length-2]:null;
-    if(v==null) return '<div class="card cur"><div class="nm">'+x[1]+'</div><div class="rate">–</div><div class="chg">&nbsp;</div></div>';
+    var s=(hist&&hist.series[x[0]]||[]).slice(), v, prev;
+    if(live && live.data[x[0]]>0){ v=live.data[x[0]]; prev=prevKey?days[prevKey][x[0]]:null; s.push(v); }      // 전일 대비는 이 화면이 직접 기록한 전 거래일 값과 비교
+    else { v=s[s.length-1]; prev=s.length>1?s[s.length-2]:null; }
+    if(v==null) return blank(x);
     var diff = prev==null?null:v-prev, cls = diff==null||Math.abs(diff)<0.005?'':diff>0?'up':'down';
     var chg = diff==null ? '&nbsp;' : (cls==='up'?'▲ ':cls==='down'?'▼ ':'– ')+Math.abs(diff).toFixed(2)+' ('+(diff>0?'+':diff<0?'−':'')+Math.abs(diff/prev*100).toFixed(2)+'%)';
     return '<div class="card cur"><div class="nm">'+x[1]+'</div>'+spark(s,cls)+
       '<div class="rate">'+v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2})+'<small>원</small></div>'+
       '<div class="chg '+cls+'">'+chg+'</div></div>';
   }).join('');
-  $('fxnote').textContent = (d.date ? d.date.slice(5).replace('-','/')+' 기준 · ' : '') + d.source + ' · 하루 1회 갱신';
+  $('fxnote').textContent = live ? '네이버 · 하나은행 매매기준율 · '+clockText(new Date(live.at))+' 확인'
+    : (hist.date ? hist.date.slice(5).replace('-','/')+' 기준 · ' : '') + hist.source + ' · 하루 1회 갱신';
 }
 
 /* ================= 그리기: 뉴스 ================= */
@@ -866,7 +895,32 @@ function fromMetNo(j){
       precipitation_probability_max:order.map(function(){ return null; }) }
   };
 }
-async function loadFx(){
+// 네이버 환율(하나은행 매매기준율). 네이버 검색 환율 계산기가 쓰는 주소로, 공식 공개 API는 아니다.
+function naverFx(code, amount){
+  return new Promise(function(resolve, reject){
+    var cb='__fx'+code+Date.now().toString(36), sc=document.createElement('script'), done=false;
+    var finish=function(err, val){ if(done) return; done=true; clearTimeout(tm); window[cb]=function(){}; if(sc.parentNode) sc.parentNode.removeChild(sc); if(err) reject(err); else resolve(val); };
+    var tm=setTimeout(function(){ finish(new Error('timeout')); }, 10000);
+    window[cb]=function(d){ try{ var v=parseFloat(String(d.country[1].value).replace(/,/g,'')); if(!(v>0)) throw 0; finish(null, v); }catch(e){ finish(new Error('shape')); } };
+    sc.onerror=function(){ finish(new Error('script')); };
+    sc.src='https://m.search.naver.com/p/csearch/content/qapirender.nhn?key=calculator&pkid=141&q=%ED%99%98%EC%9C%A8&where=m&u1=keb&u6=standardUnit&u7=0&u3='+code+'&u4=KRW&u8=down&u2='+amount+'&_callback='+cb;
+    document.head.appendChild(sc);
+  });
+}
+var FX_RANGE = {USD:[500,3500], JPY:[300,2500], EUR:[500,4000], CNY:[50,600]};          // 엉뚱한 값 걸러내기
+async function loadFxLive(){
+  try{
+    var vals = await Promise.all(CUR.map(function(x){ return naverFx(x[0], x[2]); })), o={};
+    CUR.forEach(function(x,i){ var r=FX_RANGE[x[0]]; if(!(vals[i]>=r[0] && vals[i]<=r[1])) throw new Error('range'); o[x[0]]=vals[i]; });
+    put('fxl', o);
+    var days=cache.fxd&&cache.fxd.data||{}; days[tradeDay(Date.now())]=o;
+    Object.keys(days).sort().slice(0,-10).forEach(function(k){ delete days[k]; });
+    put('fxd', days);
+    return true;
+  }catch(e){ return false; }
+}
+// 추세선과 예비 값: 유럽중앙은행 기준환율(하루 1회)
+async function loadFxHistory(){
   var names=['USD','JPY','EUR','CNY'], mult={USD:1,JPY:100,EUR:1,CNY:1};
   try{
     var from = new Date(Date.now()-45*864e5).toISOString().slice(0,10);
@@ -881,10 +935,18 @@ async function loadFx(){
       var e2 = await get('https://open.er-api.com/v6/latest/USD'); if(!e2.rates||!e2.rates.KRW) throw new Error('shape');
       var s2={}; names.forEach(function(c){ var v = c==='USD' ? e2.rates.KRW : e2.rates.KRW/e2.rates[c]*mult[c]; s2[c]=[v]; });
       put('fx',{series:s2, date:new Date(e2.time_last_update_unix*1000).toISOString().slice(0,10), source:'ExchangeRate-API'});
-    }catch(e3){ SAFE.renderFx(); return false; }
+    }catch(e3){ return false; }
   }
-  SAFE.renderFx(); return true;
+  return true;
 }
+async function loadFx(){
+  var histFresh = cache.fx && Date.now()-cache.fx.at < 60*60000;
+  var res = await Promise.all([loadFxLive(), histFresh ? true : loadFxHistory()]);
+  SAFE.renderFx(); renderStatus();
+  return res[0] || res[1];
+}
+// 평일(장중)에는 5분마다, 주말에는 1시간마다
+function fxEvery(){ var d=new Date(Date.now()+6*3600000), w=d.getUTCDay(); return (w===0||w===6) ? 60*60000 : 5*60000; }
 function feedUrl(){ return cfg.feed==='custom' ? (cfg.custom||'') : (FEEDS[cfg.feed]||FEEDS.google).url; }
 function splitSrc(title, src){ // "제목 - 언론사" 형태(Google 뉴스)에서 언론사 분리
   var i=title.lastIndexOf(' - '); if(i>0 && title.length-i<=30) return {title:title.slice(0,i).trim(), src:src||title.slice(i+3).trim()};
@@ -923,7 +985,7 @@ function due(kind, fn){
   if(busy[kind] || Date.now()<nextAt[kind]) return;
   if(navigator.onLine===false){ return; }
   busy[kind]=true;
-  fn().then(function(ok){ nextAt[kind] = Date.now() + (ok ? EVERY[kind] : 60000); })
+  fn().then(function(ok){ nextAt[kind] = Date.now() + (ok ? (kind==='fx' ? fxEvery() : EVERY[kind]) : 60000); })
       .catch(function(){ nextAt[kind] = Date.now()+60000; })
       .then(function(){ busy[kind]=false; });
 }
@@ -943,16 +1005,17 @@ function tick(){
     refresh(); renderStatus(); applyTheme();
     if(m%10===0){ SAFE.renderWeather(); SAFE.renderDust(); SAFE.renderTips(); SAFE.renderNews(); }      // 시간 흐름 반영(지나간 예보 정리)
     // 하루 한 번(새벽 4시대) 페이지 새로 고침: 오래 켜 둔 화면 정리
-    if(h===4 && Date.now()-loadedAt>6*3600000 && navigator.onLine!==false) location.reload();
+    if(h===4 && Date.now()-loadedAt>6*3600000 && navigator.onLine!==false) hardReload();
   }
   var hNow=d.getHours(), night = cfg.dim && (hNow>=23 || hNow<6) && Date.now()>wakeUntil && !$('sheet').classList.contains('open');
   document.body.classList.toggle('dim', !!night);
-  if(cfg.back>0 && page()!==0 && Date.now()-lastTouch>cfg.back*1000) go(0);
+  var idle = Date.now() - Math.max(lastTouch, mapTouchAt ? mapTouchAt+3*60000 : 0);        // 지도를 조작하는 동안에는 5분쯤 더 기다린다
+  if(cfg.back>0 && page()!==0 && idle>cfg.back*1000) go(0);
 }
 function renderStatus(){
   var c=cache.wx, el=$('upd');
   var srcName = c&&c.key===locKey() ? c.data.source : '';
-  $('src').textContent = '날씨 '+(srcName==='kma' ? '기상청' : srcName==='metno' ? 'MET Norway(예비)' : 'Open-Meteo'+(useKma()&&srcName?'(예비)':''))+' · 대기질 '+(airkData() ? '에어코리아('+cfg.station+')' : 'Open-Meteo'+(useAirk()?'(예비)':''))+' · 환율 Frankfurter';
+  $('src').textContent = '날씨 '+(srcName==='kma' ? '기상청' : srcName==='metno' ? 'MET Norway(예비)' : 'Open-Meteo'+(useKma()&&srcName?'(예비)':''))+' · 대기질 '+(airkData() ? '에어코리아('+cfg.station+')' : 'Open-Meteo'+(useAirk()?'(예비)':''))+' · 환율 '+(fxLive() ? '네이버' : '유럽중앙은행');
   showKmaMsg();
   if(!c || c.key!==locKey()){ el.textContent=''; return; }
   var stale = Date.now()-c.at > 35*60000;
@@ -965,10 +1028,25 @@ var pager=$('pager'), lastTouch=Date.now();
 function page(){ return Math.round(pager.scrollLeft/Math.max(1,pager.clientWidth)); }
 function go(i){ pager.scrollTo({left:i*pager.clientWidth, behavior:'smooth'}); }
 function syncDots(){ var p=page(); Array.prototype.forEach.call($('dots').children,function(el,i){ el.classList.toggle('on', i===p); }); }
-pager.addEventListener('scroll', function(){ syncDots(); }, {passive:true});
+pager.addEventListener('scroll', function(){ syncDots(); syncMap(); }, {passive:true});
+var PAGES = 3, MAP_PAGE = 1;
+/* 2쪽 지도: 그 화면을 보고 있을 때만 불러오고, 떠나면 20초 뒤 내려서 발열과 전력 소모를 줄인다 */
+var mapOn=false, mapTimer=null, mapTouchAt=0;
+function mapUrl(){ return 'https://earth.nullschool.net/#current/particulates/surface/level/overlay=pm2.5/orthographic='+(cfg.lon-360).toFixed(2)+','+cfg.lat.toFixed(2)+',6500/loc='+cfg.lon.toFixed(3)+','+cfg.lat.toFixed(3); }
+function setMapSrc(url){ var f=$('mapframe'); try{ f.contentWindow.location.replace(url); }catch(e){ f.src=url; } }
+function setMapTouch(on){ mapTouchAt = on ? Date.now() : 0; $('mapcard').classList.toggle('touch', !!on); $('maptouch').classList.toggle('act', !!on); $('maptouch').textContent = on ? '조작 끝내기' : '지도 조작'; }
+function mapOff(){ clearTimeout(mapTimer); if(mapOn){ setMapSrc('about:blank'); mapOn=false; } $('mapcard').classList.remove('on'); setMapTouch(false); }
+function syncMap(){
+  var want = page()===MAP_PAGE && !document.hidden;
+  if(want && mapTimer && mapOn){ clearTimeout(mapTimer); mapTimer=null; }                 // 내리려던 것을 취소
+  if(want && !mapOn && !mapTimer) mapTimer=setTimeout(function(){ mapTimer=null; if(page()!==MAP_PAGE || document.hidden) return; setMapSrc(mapUrl()); mapOn=true; setTimeout(function(){ if(mapOn) $('mapcard').classList.add('on'); }, 1500); }, 500);
+  if(!want && mapOn && !mapTimer) mapTimer=setTimeout(function(){ mapTimer=null; if(page()===MAP_PAGE && !document.hidden) return; mapOff(); }, 20000);
+  if(!want && mapTouchAt) setMapTouch(false);
+}
+$('maptouch').addEventListener('click', function(){ setMapTouch(!mapTouchAt); lastTouch=Date.now(); });
 ['touchstart','pointerdown','keydown'].forEach(function(ev){ window.addEventListener(ev,function(){ lastTouch=Date.now(); },{passive:true}); });
-$('dots').addEventListener('click', function(){ go(page()===0?1:0); });
-window.addEventListener('keydown', function(e){ if(e.key==='ArrowRight') go(1); if(e.key==='ArrowLeft') go(0); });
+$('dots').addEventListener('click', function(){ go((page()+1)%PAGES); });
+window.addEventListener('keydown', function(e){ if(e.key==='ArrowRight') go(Math.min(PAGES-1,page()+1)); if(e.key==='ArrowLeft') go(Math.max(0,page()-1)); });
 window.addEventListener('resize', function(){ var p=page(); pager.scrollTo({left:p*pager.clientWidth}); });
 $('dimmer').addEventListener('click', function(){ wakeUntil=Date.now()+60000; document.body.classList.remove('dim'); });
 
@@ -1036,12 +1114,45 @@ $('s-save').addEventListener('click', function(){
   $('where').textContent=cfg.name;
   if(!cache.wx || cache.wx.key!==locKey()){ $('hero').className='card hero'; $('hero').innerHTML='<div class="empty">날씨를 불러오는 중…</div>'; $('hourly').innerHTML=''; $('daily').innerHTML=''; $('tips').innerHTML=''; tipCtx=null; }
   if(!cache.news || cache.news.key!==feedUrl()) $('news').innerHTML='<div class="empty">뉴스를 불러오는 중…</div>';
+  if(mapOn){ mapOff(); syncMap(); }
   nextAt.wx=0; nextAt.news=0; SAFE.renderDust(); SAFE.renderWeather(); SAFE.renderNews(); refresh();
 });
 
+/* ================= 새로고침: 화면을 아래로 당겼다 놓으면 최신 버전을 다시 받는다 ================= */
+var reloading=false;
+function hardReload(){
+  if(reloading) return; reloading=true;
+  var go2=function(){ location.reload(); }, tm=setTimeout(go2, 6000);
+  try{ fetch(location.pathname, {cache:'reload'}).catch(function(){}).then(function(){ clearTimeout(tm); go2(); }); }catch(e){ clearTimeout(tm); go2(); }
+}
+(function(){
+  var ptr=$('ptr'), start=null, pulled=0, NEED=130;
+  var show=function(dy){ ptr.classList.add('drag'); ptr.style.transform='translate(-50%,calc(-130% + '+Math.round(Math.min(dy,190)*0.95)+'px))'; ptr.textContent = dy>=NEED ? '놓으면 새로고침' : '아래로 당겨서 새로고침'; };
+  var hide=function(){ ptr.classList.remove('drag'); ptr.style.transform=''; };
+  window.addEventListener('touchstart', function(e){
+    start=null; pulled=0;
+    if(reloading || e.touches.length!==1 || $('sheet').classList.contains('open')) return;
+    start={x:e.touches[0].clientX, y:e.touches[0].clientY, ok:null};
+  }, {passive:true});
+  window.addEventListener('touchmove', function(e){
+    if(!start || e.touches.length!==1) return;
+    var dx=e.touches[0].clientX-start.x, dy=e.touches[0].clientY-start.y;
+    if(start.ok===null && (Math.abs(dx)>12 || Math.abs(dy)>12)) start.ok = dy>0 && Math.abs(dy)>Math.abs(dx)*1.5;      // 옆으로 넘기는 동작과 구분
+    if(!start.ok){ if(start.ok===false) hide(); return; }
+    pulled=Math.max(0,dy); if(pulled>30) show(pulled); else hide();
+  }, {passive:true});
+  var end=function(){
+    if(start && start.ok && pulled>=NEED){ ptr.classList.remove('drag'); ptr.style.transform='translate(-50%,calc(-130% + 150px))'; ptr.textContent='새로고침 중…'; hardReload(); }
+    else hide();
+    start=null; pulled=0;
+  };
+  window.addEventListener('touchend', end, {passive:true});
+  window.addEventListener('touchcancel', function(){ start=null; pulled=0; hide(); }, {passive:true});
+})();
+
 /* ================= 화면 꺼짐 방지(지원 기기) ================= */
 function keepAwake(){ try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').catch(function(){}); }catch(e){} }
-document.addEventListener('visibilitychange', function(){ if(!document.hidden){ keepAwake(); lastMin=-1; tick(); } });
+document.addEventListener('visibilitychange', function(){ syncMap(); if(!document.hidden){ keepAwake(); lastMin=-1; tick(); } });
 window.addEventListener('online', function(){ nextAt.wx=0; nextAt.fx=0; nextAt.news=0; refresh(); });
 window.addEventListener('pointerdown', keepAwake, {once:true});
 
