@@ -133,6 +133,9 @@ header{display:flex;align-items:flex-end;justify-content:space-between;padding:0
 .mapcard{padding:0;position:relative;background:#0b0f14}
 .mapcard iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#0b0f14}
 .mapcard.touch iframe{pointer-events:auto}
+/* 지도 위 투명 덮개: 손가락 동작을 지도(iframe)가 가져가지 않고 화면 넘김으로 쓰이게 한다 */
+.mapshield{position:absolute;inset:0;z-index:3;background:rgba(0,0,0,0);transform:translateZ(0)}
+.mapcard.touch .mapshield{display:none}
 .maphold{position:absolute;inset:0;display:grid;place-items:center;color:#9aa7b7;font-size:1.2rem;pointer-events:none}
 .mapcard.on .maphold{display:none}
 .mapbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0 .3rem;font-size:.95rem;color:var(--faint)}
@@ -234,7 +237,7 @@ body.dim .dimmer{opacity:.72;pointer-events:auto}
     <div class="card daily" id="daily"></div>
   </section>
   <section class="page" id="pmap">
-    <div class="card mapcard" id="mapcard"><iframe id="mapframe" title="초미세먼지 흐름 지도" src="about:blank" sandbox="allow-scripts allow-same-origin"></iframe><div class="maphold">지도를 불러오는 중…</div></div>
+    <div class="card mapcard" id="mapcard"><iframe id="mapframe" title="초미세먼지 흐름 지도" src="about:blank" sandbox="allow-scripts allow-same-origin"></iframe><div class="maphold">지도를 불러오는 중…</div><div class="mapshield" id="mapshield"></div></div>
     <div class="mapbar"><span>초미세먼지(PM2.5) 흐름 · earth.nullschool.net · 예측 모델(측정값 아님)</span><button class="btn" id="maptouch">지도 조작</button></div>
   </section>
   <section class="page" id="p2">
@@ -1044,6 +1047,17 @@ function syncMap(){
   if(!want && mapTouchAt) setMapTouch(false);
 }
 $('maptouch').addEventListener('click', function(){ setMapTouch(!mapTouchAt); lastTouch=Date.now(); });
+// 덮개 위에서 옆으로 민 동작은 직접 계산해 넘긴다(기기에 따라 iframe 위에서는 기본 넘김이 동작하지 않음)
+(function(){
+  var sh=$('mapshield'), st=null;
+  sh.addEventListener('touchstart', function(e){ st = e.touches.length===1 ? {x:e.touches[0].clientX, y:e.touches[0].clientY, p:page(), t:Date.now()} : null; }, {passive:true});
+  sh.addEventListener('touchend', function(e){
+    if(!st || !e.changedTouches.length) return;
+    var dx=e.changedTouches[0].clientX-st.x, dy=e.changedTouches[0].clientY-st.y, p=st.p; st=null;
+    if(Math.abs(dx)>=45 && Math.abs(dx)>Math.abs(dy)*1.3) go(Math.max(0, Math.min(PAGES-1, p+(dx<0?1:-1))));       // 시작한 쪽 기준으로 한 장만
+  }, {passive:true});
+  sh.addEventListener('touchcancel', function(){ st=null; }, {passive:true});
+})();
 ['touchstart','pointerdown','keydown'].forEach(function(ev){ window.addEventListener(ev,function(){ lastTouch=Date.now(); },{passive:true}); });
 $('dots').addEventListener('click', function(){ go((page()+1)%PAGES); });
 window.addEventListener('keydown', function(e){ if(e.key==='ArrowRight') go(Math.min(PAGES-1,page()+1)); if(e.key==='ArrowLeft') go(Math.max(0,page()-1)); });
