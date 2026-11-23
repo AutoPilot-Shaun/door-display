@@ -122,9 +122,9 @@ html[data-theme="dark"] .sky-symbol .night-glyph { display: block }
 .forecast { min-width: 0; min-height: 0; display: flex; flex-direction: column }
 .hour-panel { grid-area: hourly } .day-panel { grid-area: daily }
 .forecast h2 { font-size: 1.34rem; font-weight: 700; letter-spacing: -.045em; padding: .12rem 0 .27rem; border-bottom: 1px solid var(--rule) }
-.hourly,.daily { flex: 1; display: grid; align-items: center; min-height: 0 }
+.hourly,.daily { flex: 1; display: grid; align-items: center; min-height: 0; padding: .55rem 0 .35rem }
 .hourly { grid-template-columns: repeat(8,minmax(0,1fr)) } .daily { grid-template-columns: repeat(var(--days,5),minmax(0,1fr)) }
-.h,.dy { display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; min-width: 0; border-right: 1px solid var(--line); line-height: 1.13 }
+.h,.dy { display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; gap: .12rem; min-width: 0; border-right: 1px solid var(--line); line-height: 1.13 }
 .h:last-child,.dy:last-child { border: 0 }
 .h .t,.dy .w { font-size: 1.05rem; font-weight: 620; white-space: nowrap }
 .h svg,.dy svg { width: clamp(1.7rem,4.5vh,3.3rem); height: clamp(1.7rem,4.5vh,3.3rem) }
@@ -177,12 +177,13 @@ html[data-theme="dark"] .sky-symbol .night-glyph { display: block }
 .empty{flex:1;display:grid;place-items:center;color:var(--sub);font-size:1.2rem;text-align:center;line-height:1.6;padding:1rem}
 
 footer { flex: none; border-top: 1px solid var(--rule); margin-top: .38rem; }
-.pages-nav { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: stretch }
-.pages-nav button { display: flex; align-items: center; justify-content: center; gap: .5rem; position: relative; min-height: max(44px,2.9rem); background: none; border: 0; color: var(--sub); font-size: 1.2rem; font-weight: 570 }
-.pages-nav button svg { width: 1.55rem; height: 1.55rem; flex: none }
-.pages-nav button.on { color: var(--accent); font-weight: 720 }
-.pages-nav button.on::after { content: ""; position: absolute; bottom: 0; width: 5rem; height: .2rem; border-radius: 1rem; background: var(--accent) }
-.source-line { display: flex; justify-content: space-between; gap: .7rem; color: var(--faint); margin-top: .26rem; font-size: max(10px,.74rem); line-height: 1.25 }
+.pages-nav { display: flex; align-items: center; justify-content: center; gap: .15rem }
+.pages-nav button { display: flex; align-items: center; justify-content: center; width: 2.2rem; height: 2rem; padding: 0; background: none; border: 0 }
+.pages-nav button i { display: block; width: .55rem; height: .55rem; border-radius: .3rem; background: var(--line); transition: width .2s, background .2s }
+
+.pages-nav button.on i { width: 1.5rem; background: var(--accent) }
+
+.source-line { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: .7rem; color: var(--faint); padding-top: .1rem; font-size: max(10px,.74rem); line-height: 1.25 }
 footer .src { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 footer .upd { text-align: right; white-space: nowrap }
 footer .upd.stale { color: var(--bad); font-weight: 600 }
@@ -229,7 +230,7 @@ footer .upd.stale { color: var(--bad); font-weight: 600 }
   .h .t,.dy .w,.dy .mm { font-size: .95rem }
   .gear { height: 2rem }
   #p1 { grid-template-rows: minmax(4.6rem,1fr) auto auto minmax(6.8rem,.65fr) }
-  .pages-nav button { min-height: 34px }
+  .pages-nav button { height: 1.7rem }
   .lg { display: none }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -279,7 +280,7 @@ html[data-theme="dark"] .hero[data-weather="snow"] { --scene: var(--snow-night-a
 .forecast h2 { line-height: 1.25 }
 .h .p,.dy .pp { min-height: 1em }
 @media (orientation: portrait) {
-  #p1 { grid-template-rows: minmax(9rem,1fr) auto auto auto minmax(8.4rem,.39fr) minmax(8.3rem,.36fr) }
+  #p1 { grid-template-rows: minmax(9rem,1fr) auto auto auto minmax(9.2rem,.41fr) minmax(9.2rem,.39fr) }
 }
 @media (orientation: landscape) { .temp { font-size: clamp(4.2rem,12vh,7rem) } }
 
@@ -338,12 +339,7 @@ html[data-theme="dark"] .hero[data-weather="snow"] { --scene: var(--snow-night-a
 </main>
 
 <footer>
-  <nav class="pages-nav" id="dots" aria-label="화면 선택">
-    <button type="button" data-page="0" aria-controls="p1" class="on" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19h13a4 4 0 1 0-.4-8 5.5 5.5 0 0 0-10.5 1.2A3.5 3.5 0 0 0 4 19Z"/><path d="M15 5V3m4.5 4L21 5.5M21 11h2M12 6l-1-1.5"/></svg><span>날씨</span></button>
-    <button type="button" data-page="1" aria-controls="pmap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 9.5c0 5-7.5 12-7.5 12s-7.5-7-7.5-12a7.5 7.5 0 0 1 15 0Z"/><circle cx="12" cy="9.5" r="2.6"/></svg><span>먼지 지도</span></button>
-    <button type="button" data-page="2" aria-controls="p2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h4v4H7zM14 8h3m-3 4h3m-10 4h10"/></svg><span>환율·뉴스</span></button>
-  </nav>
-  <div class="source-line"><div class="src" id="src">날씨·대기질 Open-Meteo</div><div class="upd" id="upd"></div></div>
+  <div class="source-line"><div class="src" id="src">날씨·대기질 Open-Meteo</div><nav class="pages-nav" id="dots" aria-label="화면 선택"><button type="button" data-page="0" aria-controls="p1" aria-label="날씨" class="on" aria-current="page"><i></i></button><button type="button" data-page="1" aria-controls="pmap" aria-label="먼지 지도"><i></i></button><button type="button" data-page="2" aria-controls="p2" aria-label="환율·뉴스"><i></i></button></nav><div class="upd" id="upd"></div></div>
 </footer>
 
 <div class="dimmer" id="dimmer"></div>
