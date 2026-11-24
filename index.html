@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<script>try{if(JSON.parse(localStorage.getItem('door.cfg')||'{}').design==='classic')location.replace('classic.html');}catch(e){}</script>
 <title>현관 날씨</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -303,7 +304,7 @@ html[data-theme="dark"] .hero[data-weather="snow"] { --scene: var(--snow-night-a
 
 <header>
   <div class="location">
-    <div class="where"><span id="where">서울</span><button class="gear" id="gear" aria-label="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button><button class="gear mode" id="themebtn" aria-label="화면 모드 전환"></button></div>
+    <div class="where"><span id="where">서울</span><button class="gear" id="gear" aria-label="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button><button class="gear mode" id="themebtn" aria-label="화면 모드 전환"></button><button class="gear mode" id="designbtn" aria-label="디자인 바꾸기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 10h18M10 10v10"/></svg><span>풍경</span></button></div>
     <div class="date" id="date"></div>
   </div>
   <div class="clock"><small id="ampm"></small><b id="clock"></b></div>
@@ -366,6 +367,10 @@ html[data-theme="dark"] .hero[data-weather="snow"] { --scene: var(--snow-night-a
       <label>미세먼지 측정소 (에어코리아 실측)</label>
       <div class="row"><select id="s-sido"></select><select id="s-station"><option value="">— 측정소 —</option></select></div>
       <div class="hint" id="s-airmsg"></div>
+    </div>
+    <div class="f">
+      <label>디자인</label>
+      <div class="row"><select id="s-design"><option value="scene">풍경 (새 디자인)</option><option value="classic">카드 (기존 디자인)</option></select></div>
     </div>
     <div class="f">
       <label>화면 모드</label>
@@ -1302,7 +1307,7 @@ function openSettings(){
   var ps=$('s-preset'); ps.innerHTML='<option value="">— 지역 선택 —</option>'+PRESETS.map(function(p,i){ return '<option value="'+i+'">'+p[0]+'</option>'; }).join('');
   var fs=$('s-feed'); fs.innerHTML=Object.keys(FEEDS).map(function(k){ return '<option value="'+k+'">'+FEEDS[k].label+'</option>'; }).join('');
   $('s-name').value=cfg.name; $('s-lat').value=cfg.lat; $('s-lon').value=cfg.lon; fs.value=cfg.feed; $('s-custom').value=cfg.custom;
-  $('s-dim').value=cfg.dim?'1':'0'; $('s-back').value=String(cfg.back); $('s-theme').value=mode();
+  $('s-dim').value=cfg.dim?'1':'0'; $('s-back').value=String(cfg.back); $('s-theme').value=mode(); $('s-design').value=THIS_DESIGN;
   $('s-kma').value=cfg.kmaKey||''; showKmaMsg();
   $('s-sido').innerHTML='<option value="">— 시도 —</option>'+SIDO.map(function(n){ return '<option>'+n+'</option>'; }).join('');
   $('s-sido').value=cfg.sido||guessSido(cfg.lat,cfg.lon);
@@ -1314,6 +1319,9 @@ function openSettings(){
   $('sheet').classList.add('open'); weatherScene.sync();
 }
 $('gear').addEventListener('click', openSettings);
+var THIS_DESIGN='scene';
+function switchDesign(d){ cfg.design = d==='classic' ? 'classic' : 'scene'; store.set('door.cfg',cfg); location.replace(cfg.design==='classic' ? 'classic.html' : 'index.html'); }
+$('designbtn').addEventListener('click', function(){ switchDesign(THIS_DESIGN==='classic' ? 'scene' : 'classic'); });
 $('themebtn').addEventListener('click', function(){ var order=['auto','light','dark']; cfg.mode = order[(order.indexOf(mode())+1)%3]; store.set('door.cfg',cfg); applyTheme(); });
 $('s-cancel').addEventListener('click', function(){ $('sheet').classList.remove('open'); weatherScene.sync(); });
 $('s-preset').addEventListener('change', function(){ var p=PRESETS[this.value]; if(!p) return; $('s-name').value=p[0]; $('s-lat').value=p[1]; $('s-lon').value=p[2]; });
@@ -1357,6 +1365,7 @@ $('s-save').addEventListener('click', function(){
   if(newStation!==(cfg.station||'')){ airkState.msg=''; delete cache.airk; }
   cfg.station=newStation; cfg.sido=newStation?newSido:(cfg.sido&&!newSido?'':newSido);
   store.set('door.cfg',cfg); applyTheme();
+  if($('s-design').value!==THIS_DESIGN){ switchDesign($('s-design').value); return; }
   $('sheet').classList.remove('open'); weatherScene.sync();
   $('where').textContent=cfg.name;
   if(!cache.wx || cache.wx.key!==locKey()){ weatherScene.set('unknown'); $('stats').innerHTML='<div class="stat"><span>체감</span><b>–</b></div><div class="stat"><span>강수확률</span><b>–</b></div><div class="stat"><span>습도</span><b>–</b></div><div class="stat"><span>바람</span><b>–</b></div>'; $('weather-now').innerHTML='<div class="empty">날씨를 불러오는 중…</div>'; $('hourly').innerHTML=$('daily').innerHTML='<div class="forecast-empty">예보를 기다리는 중…</div>'; $('tips').innerHTML=''; tipCtx=null; }

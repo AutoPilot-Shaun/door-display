@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<script>try{if(JSON.parse(localStorage.getItem('door.cfg')||'{}').design!=='classic')location.replace('index.html');}catch(e){location.replace('index.html');}</script>
+<title>현관 날씨</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="현관 날씨">
+<meta name="theme-color" content="#eef1f5">
+<link rel="manifest" href="manifest.json">
+<script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('door.lastTheme')==='dark'?'dark':'light');}catch(e){}</script>
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon.png">
+<style>
+:root{            /* 화이트 모드 (기본) */
+  --bg:#eef1f5; --card:#ffffff; --card2:#e3e8ef; --line:#e2e7ee;
+  --text:#121922; --sub:#586574; --faint:#8490a0;
+  --good:#1d7fe0; --normal:#129a56; --bad:#dc8400; --worst:#de342e;
+  --up:#de3a30; --down:#1f6fd6;
+  --hero:linear-gradient(140deg,#d9e9ff,#ffffff 72%); --hero-night:linear-gradient(140deg,#e2e4f6,#ffffff 72%);
+  --shadow:0 1px 2px rgba(20,35,60,.05),0 4px 14px rgba(20,35,60,.05); --on-pri:#ffffff; --knob:#ffffff;
+  --sun:#f5ad00; --moon:#8b95bd; --c1:#bcc7d3; --c2:#a7b3c1; --c3:#929eac; --c4:#768290; --rain:#2f8fe6; --snow:#7db0e6; --bolt:#f0a400;
+}
+html[data-theme="dark"]{   /* 다크 모드 */
+  --bg:#0a0e13; --card:#141b24; --card2:#1a2330; --line:#243040;
+  --text:#f3f6f9; --sub:#9aa7b7; --faint:#66727f;
+  --good:#4aa8ff; --normal:#35c57a; --bad:#f7a531; --worst:#f4514b;
+  --up:#ff6b61; --down:#5aa9ff;
+  --hero:linear-gradient(140deg,#1b2a3f,#131a24 70%); --hero-night:linear-gradient(140deg,#1a1f3a,#11151f 70%);
+  --shadow:none; --on-pri:#04121f; --knob:#ffffff;
+  --sun:#ffc94d; --moon:#d5ddf0; --c1:#dfe6ee; --c2:#c5cfda; --c3:#aab5c2; --c4:#8c98a6; --rain:#5bb4ff; --snow:#ffffff; --bolt:#ffd54a;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+/* 아이패드 미니(744pt 폭)에서 1rem = 16px, 다른 화면에서는 비율대로 */
+html{font-size:calc(100vw / 46.5)}
+@media (orientation:landscape){html{font-size:calc(100vh / 46.5)}}
+html,body{height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+body{
+  color:var(--text);
+  font-family:-apple-system,"SF Pro Display","Apple SD Gothic Neo","Noto Sans KR","Noto Sans CJK KR","Malgun Gothic",sans-serif;
+  font-variant-numeric:tabular-nums;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  display:flex;flex-direction:column;height:100vh;height:100dvh;
+  padding:calc(env(safe-area-inset-top) + .9rem) calc(env(safe-area-inset-right) + 1.4rem) calc(env(safe-area-inset-bottom) + .5rem) calc(env(safe-area-inset-left) + 1.4rem);
+}
+button,select,input{font:inherit;color:inherit}
+
+/* ---------- 상단 ---------- */
+header{display:flex;align-items:flex-end;justify-content:space-between;padding:0 .3rem .8rem;flex:none}
+.where{font-size:1.25rem;color:var(--sub);font-weight:600;display:flex;align-items:center;gap:.5rem}
+.date{font-size:2rem;font-weight:700;letter-spacing:-.02em;margin-top:.15rem}
+.clock{display:flex;align-items:baseline;gap:.45rem}
+.clock small{font-size:1.3rem;color:var(--sub);font-weight:600}
+.clock b{font-size:3.5rem;font-weight:700;letter-spacing:-.03em;line-height:1}
+.gear{border:0;background:none;width:2rem;height:2rem;display:grid;place-items:center;opacity:.5;color:var(--text)}
+.gear svg{width:1.3rem;height:1.3rem}
+.gear.mode{width:auto;gap:.3rem;display:flex;align-items:center;font-size:.95rem;font-weight:600;padding:0 .2rem}
+.tophint{flex:none;display:none;align-items:center;gap:.8rem;background:var(--card2);border-radius:.9rem;padding:.6rem 1rem;margin-bottom:.7rem;font-size:1rem;line-height:1.4}
+.tophint.show{display:flex} .tophint span{flex:1} .tophint button{border:0;background:none;font-size:1rem;font-weight:700;color:var(--good);padding:.3rem .5rem;white-space:nowrap}
+
+/* ---------- 넘기는 영역 ---------- */
+.pager{flex:1;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -1.4rem}
+.pager::-webkit-scrollbar{display:none}
+.page{flex:0 0 100%;min-width:0;height:100%;scroll-snap-align:start;scroll-snap-stop:always;padding:0 1.4rem;display:grid;gap:.9rem}
+.card{background:var(--card);border-radius:1.4rem;padding:1.2rem 1.4rem;min-width:0;min-height:0;overflow:hidden;box-shadow:var(--shadow)}
+.label{font-size:1.05rem;font-weight:600;color:var(--sub)}
+
+/* ---------- 1쪽: 날씨 ---------- */
+#p1{grid-template-rows:1.5fr auto 1.15fr .95fr .8fr;grid-template-areas:"hero" "tips" "dust" "hourly" "daily"}
+.hero{grid-area:hero;display:flex;align-items:center;gap:1.2rem;background:var(--hero)}
+.hero.night{background:var(--hero-night)}
+.hero .ico{width:10.5rem;height:10.5rem;flex:none}
+.hero .now{flex:1;min-width:0}
+.temp{font-size:8.2rem;font-weight:700;letter-spacing:-.05em;line-height:.95}
+.temp sup{font-size:3.6rem;font-weight:500;vertical-align:top;position:relative;top:.7rem;color:var(--sub)}
+.cond{font-size:2rem;font-weight:700;margin-top:.35rem}
+.range{font-size:1.3rem;color:var(--sub);margin-top:.25rem;font-weight:500}
+.range b{color:var(--text);font-weight:600}
+.stats{display:grid;gap:.75rem;flex:none;min-width:11rem}
+.stat{display:flex;justify-content:space-between;align-items:baseline;gap:1.2rem;border-bottom:1px solid var(--line);padding-bottom:.55rem}
+.stat:last-child{border:0;padding:0}
+.stat span{font-size:1.1rem;color:var(--sub)}
+.stat b{font-size:1.5rem;font-weight:600}
+
+.tips{grid-area:tips;display:flex;gap:.6rem;flex-wrap:wrap;max-height:2.7rem;overflow:hidden}   /* 한 줄에 들어가는 만큼만 */
+.tip{background:var(--card2);border-radius:999px;padding:0 1.05rem;height:2.7rem;font-size:1.2rem;font-weight:600;display:flex;align-items:center;gap:.5rem;white-space:nowrap}
+.tip i{width:.7rem;height:.7rem;border-radius:50%;background:var(--normal);flex:none}
+.tip.warn i{background:var(--bad)} .tip.alert i{background:var(--worst)} .tip.info i{background:var(--good)}
+
+.dust{grid-area:dust;display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.pm{border-radius:1.4rem;padding:1.15rem 1.4rem;display:flex;flex-direction:column;justify-content:space-between;background:var(--card);border:2px solid transparent;min-height:0;box-shadow:var(--shadow)}
+.pm .top{display:flex;justify-content:space-between;align-items:baseline}
+.pm .name{font-size:1.3rem;font-weight:700}
+.pm .name small{font-size:.95rem;color:var(--sub);font-weight:500;margin-left:.3rem}
+.pm .val{font-size:1.25rem;color:var(--sub);font-weight:500}
+.pm .val b{font-size:1.9rem;color:var(--text);font-weight:700;margin-right:.2rem}
+.pm .grade{font-size:4.4rem;font-weight:800;letter-spacing:-.04em;line-height:1.05}
+.pm .next{font-size:1.05rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm .grade.long{font-size:4rem}
+.pm .who{font-size:1.05rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm .who.over{color:var(--text);font-weight:700}
+.bar{position:relative;height:.6rem;border-radius:.3rem;display:grid;grid-template-columns:repeat(4,1fr);gap:.2rem;margin:.3rem 0 .15rem}
+.bar s{border-radius:.3rem;opacity:.38}
+.bar s:nth-child(1){background:var(--good)} .bar s:nth-child(2){background:var(--normal)} .bar s:nth-child(3){background:var(--bad)} .bar s:nth-child(4){background:var(--worst)}
+.bar em{position:absolute;top:50%;width:1.25rem;height:1.25rem;border-radius:50%;background:var(--knob);border:.28rem solid var(--g);transform:translate(-50%,-50%)}
+.pm.g0{--g:var(--good)} .pm.g1{--g:var(--normal)} .pm.g2{--g:var(--bad)} .pm.g3{--g:var(--worst)}
+.pm[class*=" g"]{background:color-mix(in srgb,var(--g) 15%,var(--card));border-color:color-mix(in srgb,var(--g) 40%,transparent)}
+.pm .grade{color:var(--g,var(--sub))}
+
+.hourly{grid-area:hourly;display:grid;grid-template-columns:repeat(8,1fr);align-items:center;padding:.6rem .8rem}
+.h{display:flex;flex-direction:column;align-items:center;gap:.2rem;min-width:0}
+.h .t{font-size:1.05rem;color:var(--sub);font-weight:500}
+.h svg{width:3rem;height:3rem}
+.h .d{font-size:1.55rem;font-weight:700}
+.h .p{font-size:.95rem;color:var(--good);font-weight:600;min-height:1.2em}
+.daily{grid-area:daily;display:grid;grid-template-columns:repeat(var(--days,5),1fr);align-items:center;padding:.9rem .8rem}
+.dy{display:flex;align-items:center;justify-content:center;gap:.55rem;min-width:0;border-right:1px solid var(--line)}
+.dy:last-child{border:0}
+.dy svg{width:2.6rem;height:2.6rem;flex:none}
+.dy .w{font-size:1.1rem;font-weight:700}
+.dy .w.sun{color:var(--up)} .dy .w.sat{color:var(--down)}
+.dy .mm{font-size:1.1rem;font-weight:600;white-space:nowrap}
+.dy .mm span{color:var(--sub);font-weight:500}
+.dy .pp{font-size:.85rem;color:var(--good);font-weight:600;min-height:1.1em}
+
+/* ---------- 2쪽: 환율 · 뉴스 ---------- */
+#p2{grid-template-rows:auto 1fr;grid-template-areas:"fx" "news"}
+/* ---------- 2쪽: 초미세먼지 흐름 지도 ---------- */
+#pmap{grid-template-rows:minmax(0,1fr) auto}
+.mapcard{padding:0;position:relative;background:#0b0f14}
+.mapcard iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#0b0f14}
+.mapcard.touch iframe{pointer-events:auto}
+/* 지도 위 투명 덮개: 손가락 동작을 지도(iframe)가 가져가지 않고 화면 넘김으로 쓰이게 한다 */
+.mapshield{position:absolute;inset:0;z-index:3;background:rgba(0,0,0,0);transform:translateZ(0)}
+.mapcard.touch .mapshield{display:none}
+.maphold{position:absolute;inset:0;display:grid;place-items:center;color:#9aa7b7;font-size:1.2rem;pointer-events:none}
+.mapcard.on .maphold{display:none}
+.mapbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0 .3rem;font-size:.95rem;color:var(--faint)}
+.mapbar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mapbar .btn{font-size:1rem;padding:.5rem 1rem;flex:none}
+.mapbar .btn.act{background:var(--good);color:var(--on-pri)}
+/* ---------- 당겨서 새로고침 ---------- */
+.ptr{position:fixed;left:50%;top:0;transform:translate(-50%,-130%);background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:.6rem 1.3rem;font-size:1.05rem;font-weight:600;z-index:70;pointer-events:none;transition:transform .25s;white-space:nowrap}
+.ptr.drag{transition:none}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.8rem;padding:0 .3rem}
+.sec-h h2{font-size:1.6rem;font-weight:700}
+.sec-h span{font-size:.95rem;color:var(--faint)}
+.fxwrap{grid-area:fx;min-width:0}
+.fx{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.cur{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.15rem .8rem;align-items:center;padding:.95rem 1.3rem}
+.cur .nm{font-size:1.1rem;color:var(--sub);font-weight:600;white-space:nowrap}
+.cur .rate{font-size:2.35rem;font-weight:700;letter-spacing:-.03em;white-space:nowrap;line-height:1.15}
+.cur .rate small{font-size:1.1rem;color:var(--sub);font-weight:500;margin-left:.2rem}
+.cur .chg{font-size:1.1rem;font-weight:600;color:var(--sub);white-space:nowrap}
+.cur .chg.up{color:var(--up)} .cur .chg.down{color:var(--down)}
+.cur svg{grid-row:1 / span 3;grid-column:2;width:6.3rem;height:3.8rem}
+.newswrap{grid-area:news;min-height:0;min-width:0;display:flex;flex-direction:column}
+.news{flex:1;min-height:0;padding:.4rem 1.5rem;display:flex;flex-direction:column}
+.n{flex:1 1 auto;min-height:0;display:flex;align-items:center;gap:1rem;border-bottom:1px solid var(--line);padding:.45rem 0}
+.n:last-child{border:0}
+.n .no{font-size:1.3rem;font-weight:700;color:var(--faint);width:1.4rem;flex:none;text-align:center}
+.n .tt{font-size:1.3rem;font-weight:600;line-height:1.32;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.n .mt{font-size:.95rem;color:var(--sub);margin-top:.2rem}
+.empty{flex:1;display:grid;place-items:center;color:var(--sub);font-size:1.2rem;text-align:center;line-height:1.6;padding:1rem}
+
+/* ---------- 하단 ---------- */
+footer{flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:.55rem .3rem 0;font-size:.85rem;color:var(--faint)}
+footer .src{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+footer .upd{text-align:right;white-space:nowrap}
+footer .upd.stale{color:var(--bad);font-weight:600}
+.dots{display:flex;gap:.5rem;padding:.4rem 1rem}
+.dots i{width:.55rem;height:.55rem;border-radius:50%;background:var(--line);transition:.2s}
+.dots i.on{background:var(--text);width:1.5rem;border-radius:.3rem}
+
+/* ---------- 가로 화면 ---------- */
+@media (orientation:landscape){
+  #p1{grid-template-columns:1.12fr 1fr;grid-template-rows:1.25fr auto 1fr;grid-template-areas:"hero dust" "tips tips" "hourly daily"}
+  .hero .ico{width:8.5rem;height:8.5rem}
+  .temp{font-size:6.6rem} .temp sup{font-size:3rem;top:.5rem}
+  .cond{font-size:1.7rem}
+  .stats{min-width:9.5rem;gap:.6rem} .stat b{font-size:1.3rem}
+  .pm{padding:1rem 1.15rem} .pm .grade{font-size:3.3rem} .pm .grade.long{font-size:2.7rem} .pm .name small,.pm .next .lg,.pm .who .lg{display:none}
+  .pm .val{font-size:1rem} .pm .val b{font-size:1.7rem}
+  .hourly{grid-template-columns:repeat(6,1fr)} .h:nth-child(n+7){display:none}
+  .daily{grid-template-columns:1fr;grid-auto-rows:1fr;padding:.5rem 1.4rem}
+  .dy{border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:2.4rem 3.6rem 1fr 3.4rem;gap:1rem;height:100%}
+  .dy .txt{display:contents}
+  .dy .mm{font-size:1.2rem} .dy .pp{text-align:right;font-size:1rem}
+  .dy svg{width:2.1rem;height:2.1rem}
+  #p2{grid-template-columns:1fr 1.25fr;grid-template-rows:1fr;grid-template-areas:"fx news"}
+  .fxwrap{display:flex;flex-direction:column;min-height:0}
+  .fx{grid-template-columns:1fr;grid-auto-rows:minmax(0,1fr);flex:1;min-height:0;gap:.7rem}
+  .cur{padding:.45rem 1.3rem;align-content:center} .cur .rate{font-size:2.1rem} .cur svg{width:9rem;height:3.4rem}
+  .n .tt{font-size:1.25rem}
+}
+
+/* ---------- 야간 어둡게 ---------- */
+.dimmer{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 1.2s;z-index:50}
+body.dim .dimmer{opacity:.72;pointer-events:auto}
+
+/* ---------- 설정 ---------- */
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center;z-index:60}
+.sheet.open{display:grid}
+.panel{background:var(--card);border-radius:1.5rem;padding:1.6rem;width:34rem;max-width:92vw;max-height:90vh;overflow:auto;-webkit-user-select:auto;user-select:auto}
+.panel h3{font-size:1.5rem;margin-bottom:1rem}
+.f{margin-bottom:1.1rem}
+.f>label{display:block;font-size:1rem;color:var(--sub);font-weight:600;margin-bottom:.4rem}
+.f .row{display:flex;gap:.5rem}
+.f input[type=text],.f input[type=number],.f select{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:.7rem;padding:.65rem .8rem;font-size:1.1rem;-webkit-appearance:none;appearance:none}
+.f .hint{font-size:.9rem;color:var(--faint);margin-top:.35rem;line-height:1.45}
+.btn{border:0;border-radius:.7rem;padding:.7rem 1.1rem;font-size:1.1rem;font-weight:600;background:var(--card2);white-space:nowrap}
+.btn.pri{background:var(--good);color:var(--on-pri)}
+.acts{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.3rem}
+</style>
+</head>
+<body>
+
+<div class="tophint" id="hint"><span>전체 화면으로 보려면: Safari 공유 버튼 → <b>홈 화면에 추가</b>(‘웹 앱으로 열기’ 켬) → 홈 화면에 생긴 <b>현관 날씨</b> 아이콘으로 여세요.</span><button id="hint-x">닫기</button></div>
+
+<header>
+  <div>
+    <div class="where"><span id="where">서울</span><button class="gear" id="gear" aria-label="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button><button class="gear mode" id="themebtn" aria-label="화면 모드 전환"></button><button class="gear mode" id="designbtn" aria-label="디자인 바꾸기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 10h18M10 10v10"/></svg><span>카드</span></button></div>
+    <div class="date" id="date"></div>
+  </div>
+  <div class="clock"><small id="ampm"></small><b id="clock"></b></div>
+</header>
+
+<main class="pager" id="pager">
+  <section class="page" id="p1">
+    <div class="card hero" id="hero"><div class="empty">날씨를 불러오는 중…</div></div>
+    <div class="tips" id="tips"></div>
+    <div class="dust" id="dust"></div>
+    <div class="card hourly" id="hourly"></div>
+    <div class="card daily" id="daily"></div>
+  </section>
+  <section class="page" id="pmap">
+    <div class="card mapcard" id="mapcard"><iframe id="mapframe" title="초미세먼지 흐름 지도" src="about:blank" sandbox="allow-scripts allow-same-origin"></iframe><div class="maphold">지도를 불러오는 중…</div><div class="mapshield" id="mapshield"></div></div>
+    <div class="mapbar"><span>초미세먼지(PM2.5) 흐름 · earth.nullschool.net · 예측 모델(측정값 아님)</span><button class="btn" id="maptouch">지도 조작</button></div>
+  </section>
+  <section class="page" id="p2">
+    <div class="fxwrap">
+      <div class="sec-h"><h2>환율</h2><span id="fxnote"></span></div>
+      <div class="fx" id="fx"></div>
+    </div>
+    <div class="newswrap">
+      <div class="sec-h"><h2>오늘의 뉴스</h2><span id="newsnote"></span></div>
+      <div class="card news" id="news"><div class="empty">뉴스를 불러오는 중…</div></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="src" id="src">날씨·대기질 Open-Meteo</div>
+  <div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
+  <div class="upd" id="upd"></div>
+</footer>
+
+<div class="dimmer" id="dimmer"></div>
+<div class="ptr" id="ptr">아래로 당겨서 새로고침</div>
+
+<div class="sheet" id="sheet">
+  <div class="panel">
+    <h3>설정</h3>
+    <div class="f">
+      <label>지역</label>
+      <div class="row"><select id="s-preset"></select><button class="btn" id="s-geo">현재 위치</button></div>
+      <div class="hint" id="s-geomsg">목록에 없으면 ‘현재 위치’를 누르거나 아래에 위도·경도를 직접 넣으세요.</div>
+    </div>
+    <div class="f">
+      <label>표시 이름 / 위도 / 경도</label>
+      <div class="row"><input type="text" id="s-name" placeholder="우리 집"><input type="number" id="s-lat" step="0.0001" placeholder="위도"><input type="number" id="s-lon" step="0.0001" placeholder="경도"></div>
+    </div>
+    <div class="f">
+      <label>공공데이터포털 인증키 (기상청 · 에어코리아 공용)</label>
+      <div class="row"><input type="text" id="s-kma" placeholder="인증키 붙여넣기 · 비워 두면 해외 예보 모델 사용" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"></div>
+      <div class="hint" id="s-kmamsg"></div>
+    </div>
+    <div class="f">
+      <label>미세먼지 측정소 (에어코리아 실측)</label>
+      <div class="row"><select id="s-sido"></select><select id="s-station"><option value="">— 측정소 —</option></select></div>
+      <div class="hint" id="s-airmsg"></div>
+    </div>
+    <div class="f">
+      <label>디자인</label>
+      <div class="row"><select id="s-design"><option value="scene">풍경 (새 디자인)</option><option value="classic">카드 (기존 디자인)</option></select></div>
+    </div>
+    <div class="f">
+      <label>화면 모드</label>
+      <div class="row"><select id="s-theme"><option value="auto">자동 — 해가 지면 다크, 해가 뜨면 화이트</option><option value="light">항상 화이트</option><option value="dark">항상 다크</option></select></div>
+      <div class="hint" id="s-sun"></div>
+    </div>
+    <div class="f">
+      <label>뉴스</label>
+      <div class="row"><select id="s-feed"></select></div>
+      <div class="row" style="margin-top:.5rem"><input type="text" id="s-custom" placeholder="직접 입력: RSS 주소 (https://…)" autocapitalize="off" autocorrect="off"></div>
+    </div>
+    <div class="f">
+      <label>밤에 화면 어둡게 (밤 11시 ~ 아침 6시)</label>
+      <div class="row"><select id="s-dim"><option value="1">켜기 — 화면을 누르면 1분간 밝아짐</option><option value="0">끄기</option></select></div>
+    </div>
+    <div class="f">
+      <label>지도·환율 화면에서 날씨 화면으로 자동 복귀</label>
+      <div class="row"><select id="s-back"><option value="0">안 함</option><option value="60">1분 뒤</option><option value="120">2분 뒤</option><option value="300">5분 뒤</option></select></div>
+    </div>
+    <div class="acts"><button class="btn" id="s-cancel">닫기</button><button class="btn pri" id="s-save">저장</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= 설정 ================= */
+var PRESETS = [
+ ['서울',37.5665,126.9780],['서울 강남',37.5172,127.0473],['서울 송파',37.5145,127.1059],['서울 마포',37.5663,126.9014],['서울 노원',37.6542,127.0568],['서울 강서',37.5509,126.8495],['서울 은평',37.6027,126.9291],['서울 관악',37.4784,126.9516],
+ ['부산',35.1796,129.0756],['대구',35.8714,128.6014],['인천',37.4563,126.7052],['광주',35.1595,126.8526],['대전',36.3504,127.3845],['울산',35.5384,129.3114],['세종',36.4800,127.2890],
+ ['수원',37.2636,127.0286],['성남',37.4200,127.1267],['성남 분당',37.3827,127.1189],['고양',37.6584,126.8320],['용인',37.2411,127.1776],['부천',37.5034,126.7660],['안산',37.3219,126.8309],['안양',37.3943,126.9568],['남양주',37.6360,127.2165],['화성',37.1995,126.8312],['평택',36.9921,127.1129],['의정부',37.7381,127.0337],['파주',37.7600,126.7800],['김포',37.6153,126.7156],['광명',37.4786,126.8644],['하남',37.5393,127.2148],
+ ['춘천',37.8813,127.7298],['원주',37.3422,127.9202],['강릉',37.7519,128.8761],['청주',36.6424,127.4890],['충주',36.9910,127.9259],['천안',36.8151,127.1139],['아산',36.7898,127.0019],
+ ['전주',35.8242,127.1480],['군산',35.9676,126.7366],['익산',35.9483,126.9577],['목포',34.8118,126.3922],['여수',34.7604,127.6622],['순천',34.9507,127.4872],
+ ['포항',36.0190,129.3435],['경주',35.8562,129.2247],['구미',36.1195,128.3446],['안동',36.5684,128.7294],['창원',35.2280,128.6811],['진주',35.1800,128.1076],['김해',35.2285,128.8894],['양산',35.3350,129.0372],['거제',34.8806,128.6211],
+ ['제주',33.4996,126.5312],['서귀포',33.2541,126.5600]
+];
+var FEEDS = {
+  google:   {label:'Google 뉴스 · 주요 뉴스',  url:'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko'},
+  yna:      {label:'연합뉴스 · 최신',          url:'https://www.yna.co.kr/rss/news.xml'},
+  economy:  {label:'Google 뉴스 · 경제',       url:'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko'},
+  custom:   {label:'직접 입력한 RSS',          url:''}
+};
+var DEFAULTS = {name:'서울', lat:37.5665, lon:126.9780, feed:'google', custom:'', dim:1, back:120, mode:'auto', kmaKey:'', sido:'', station:''};
+
+var store = {
+  get:function(k,d){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set:function(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+var cfg = Object.assign({}, DEFAULTS, store.get('door.cfg', {}));
+var cache = store.get('door.cache', {});          // {wx:{at,data,key}, air:…, fx:…, news:…}
+var $ = function(id){ return document.getElementById(id); };
+var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+var locKey = function(){ return cfg.lat.toFixed(3)+','+cfg.lon.toFixed(3); };
+
+/* ================= 화면 모드 (자동 / 화이트 / 다크) ================= */
+var ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+var ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+var ICON_AUTO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>';
+var MODE_LABEL = {auto:'자동', light:'화이트', dark:'다크'};
+function mode(){ return MODE_LABEL[cfg.mode] ? cfg.mode : 'auto'; }
+
+// 설정된 위치의 그날 일출·일몰 시각 (천문 계산식, 인터넷 연결과 무관하게 동작)
+function sunTimes(date, lat, lon){
+  var rad=Math.PI/180;
+  var n = Math.floor(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000) + 2440588 - 2451545;   // 2000-01-01 정오 기준 날짜 수
+  var js = n - lon/360;
+  var M = (357.5291 + 0.98560028*js) % 360;
+  var C = 1.9148*Math.sin(M*rad) + 0.02*Math.sin(2*M*rad) + 0.0003*Math.sin(3*M*rad);
+  var L = (M + C + 180 + 102.9372) % 360;
+  var transit = 2451545 + js + 0.0053*Math.sin(M*rad) - 0.0069*Math.sin(2*L*rad);
+  var sinD = Math.sin(L*rad)*Math.sin(23.4397*rad), cosD = Math.cos(Math.asin(sinD));
+  var cosW = (Math.sin(-0.833*rad) - Math.sin(lat*rad)*sinD) / (Math.cos(lat*rad)*cosD);
+  if(cosW > 1) return {polar:'night'};          // 해가 뜨지 않는 날
+  if(cosW < -1) return {polar:'day'};           // 해가 지지 않는 날
+  var w = Math.acos(cosW)/rad, toMs = function(j){ return (j - 2440587.5)*86400000; };
+  return {rise:toMs(transit - w/360), set:toMs(transit + w/360)};
+}
+function isNight(now){
+  var t = sunTimes(new Date(now), cfg.lat, cfg.lon);
+  if(t.polar) return t.polar==='night';
+  return now < t.rise || now >= t.set;
+}
+function applyTheme(){
+  var m = mode(), dark = m==='dark' || (m==='auto' && isNight(Date.now()));
+  if(document.documentElement.getAttribute('data-theme') !== (dark?'dark':'light')) document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+  var meta=document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute('content', dark?'#0a0e13':'#eef1f5');
+  var b=$('themebtn'), html=(m==='auto'?ICON_AUTO:m==='dark'?ICON_MOON:ICON_SUN)+'<span>'+MODE_LABEL[m]+'</span>';
+  if(b && b.getAttribute('data-m')!==m){ b.innerHTML=html; b.setAttribute('data-m',m); }    // 현재 모드를 표시, 누르면 다음 모드로
+  try{ localStorage.setItem('door.lastTheme', dark?'dark':'light'); }catch(e){}
+}
+
+var SAFE = {};
+
+/* ================= 네트워크 ================= */
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+async function get(url, asText, opt){
+  var err, tries=(opt&&opt.tries)||3, limit=(opt&&opt.timeout)||12000;
+  for (var i=0;i<tries;i++){
+    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, limit);
+    try{
+      var r = await fetch(url, {signal:ctl.signal, cache:'no-store'});
+      clearTimeout(t);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return asText ? await r.text() : await r.json();
+    }catch(e){ clearTimeout(t); err=e; if(i<tries-1) await sleep(1500*(i+1)); }
+  }
+  throw err;
+}
+function put(kind, data, key){ cache[kind] = {at:Date.now(), data:data, key:key||''}; store.set('door.cache', cache); }
+
+/* ================= 날씨 아이콘 ================= */
+var CLOUD = 'M18 48a10 10 0 0 1 2.2-19.8A14 14 0 0 1 47 31.5 8.5 8.5 0 0 1 46 48z';
+function sun(cx,cy,r){
+  var s='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="var(--sun)"/>';
+  for(var i=0;i<8;i++){ var a=i*Math.PI/4, x1=cx+Math.cos(a)*(r+3.5), y1=cy+Math.sin(a)*(r+3.5), x2=cx+Math.cos(a)*(r+8), y2=cy+Math.sin(a)*(r+8);
+    s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="var(--sun)" stroke-width="3" stroke-linecap="round"/>'; }
+  return s;
+}
+function moon(cx,cy,r){ return '<path d="M'+(cx+r*0.55)+' '+(cy+r*0.75)+'A'+r+' '+r+' 0 1 1 '+(cx+r*0.1)+' '+(cy-r)+'A'+(r*0.78)+' '+(r*0.78)+' 0 0 0 '+(cx+r*0.55)+' '+(cy+r*0.75)+'z" fill="var(--moon)"/>'; }
+function cloud(fill,dy){ return '<path d="'+CLOUD+'" fill="'+fill+'" transform="translate(0,'+(dy||0)+')"/>'; }
+function drops(n,heavy){ var s='',xs=n===2?[26,38]:[22,32,42]; xs.forEach(function(x){ s+='<line x1="'+x+'" y1="47" x2="'+(x-3)+'" y2="'+(heavy?58:55)+'" stroke="var(--rain)" stroke-width="'+(heavy?3.4:2.8)+'" stroke-linecap="round"/>'; }); return s; }
+function flakes(){ var s=''; [[23,50],[33,55],[43,50]].forEach(function(p){ s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="2.6" fill="var(--snow)"/>'; }); return s; }
+function icon(kind, day){
+  var b='';
+  if(kind==='clear') b = day ? sun(32,32,12) : moon(32,32,15);
+  else if(kind==='partly') b = (day ? sun(42,24,9) : moon(43,22,11)) + cloud('var(--c1)',4);
+  else if(kind==='cloudy') b = '<path d="'+CLOUD+'" fill="var(--c4)" transform="translate(9,-9) scale(.82)"/>' + cloud('var(--c2)',4);
+  else if(kind==='fog') b = cloud('var(--c3)',-8) + '<g stroke="var(--c2)" stroke-width="3" stroke-linecap="round"><line x1="16" y1="47" x2="48" y2="47"/><line x1="21" y1="54" x2="43" y2="54"/></g>';
+  else if(kind==='drizzle') b = cloud('var(--c2)',-8) + drops(2,false);
+  else if(kind==='rain') b = cloud('var(--c3)',-8) + drops(3,false);
+  else if(kind==='heavy') b = cloud('var(--c4)',-8) + drops(3,true);
+  else if(kind==='sleet') b = cloud('var(--c3)',-8) + '<line x1="24" y1="47" x2="21" y2="55" stroke="var(--rain)" stroke-width="2.8" stroke-linecap="round"/><circle cx="33" cy="54" r="2.6" fill="var(--snow)"/><line x1="44" y1="47" x2="41" y2="55" stroke="var(--rain)" stroke-width="2.8" stroke-linecap="round"/>';
+  else if(kind==='snow') b = cloud('var(--c2)',-8) + flakes();
+  else if(kind==='thunder') b = cloud('var(--c4)',-8) + '<polygon points="34,42 25,53 31,53 28,62 40,49 33,49 37,42" fill="var(--bolt)"/>';
+  return '<svg viewBox="0 0 64 64" aria-hidden="true">'+b+'</svg>';
+}
+var WMO = {0:['맑음','clear'],1:['대체로 맑음','clear'],2:['구름 조금','partly'],3:['흐림','cloudy'],45:['안개','fog'],48:['짙은 안개','fog'],
+ 51:['약한 이슬비','drizzle'],53:['이슬비','drizzle'],55:['이슬비','drizzle'],56:['어는 이슬비','sleet'],57:['어는 이슬비','sleet'],
+ 61:['약한 비','rain'],63:['비','rain'],65:['강한 비','heavy'],66:['어는 비','sleet'],67:['어는 비','sleet'],
+ 71:['약한 눈','snow'],73:['눈','snow'],75:['많은 눈','snow'],77:['싸락눈','snow'],
+ 80:['소나기','rain'],81:['소나기','rain'],82:['강한 소나기','heavy'],85:['눈 소나기','snow'],86:['강한 눈 소나기','snow'],
+ 95:['천둥번개','thunder'],96:['천둥·우박','thunder'],99:['천둥·우박','thunder'],
+ 68:['진눈깨비','sleet'],103:['구름많음','partly'],150:['빗방울','drizzle'],151:['빗방울·눈날림','sleet'],152:['눈날림','snow']};
+function wmo(c){ return WMO[c] || ['—','cloudy']; }
+var WET = {drizzle:1,rain:1,heavy:1,sleet:1,thunder:1};
+
+/* ================= 미세먼지 등급 (환경부 기준) ================= */
+var GRADE = ['좋음','보통','나쁨','매우나쁨'];
+var LIM = {pm10:[30,80,150,300], pm25:[15,35,75,150]};
+function grade(kind,v){ var L=LIM[kind]; return v<=L[0]?0 : v<=L[1]?1 : v<=L[2]?2 : 3; }
+function barPos(kind,v){ var L=[0].concat(LIM[kind]), g=grade(kind,v), f=Math.min(1,(v-L[g])/(L[g+1]-L[g])); return Math.max(3,Math.min(97,(g+f)*25)); }
+
+/* ================= 그리기: 날씨 ================= */
+function hh(iso){ return parseInt(iso.slice(11,13),10); }
+function renderWeather(){
+  var c = cache.wx; if(!c || c.key!==locKey()){ return; }
+  var d = c.data, cur = d.current, dl = d.daily, hr = d.hourly;
+  var w = wmo(cur.weather_code), day = cur.is_day===1;
+  // 지금 시각 기준으로 시간별 예보 시작 위치 찾기 (캐시가 오래됐어도 지나간 시간은 건너뜀)
+  var nowIso = placeNow(d).slice(0,13);
+  var i0 = 0; while(i0 < hr.time.length-1 && hr.time[i0].slice(0,13) <= nowIso) i0++;
+  var dayIdx = Math.max(0, dl.time.indexOf(nowIso.slice(0,10)));
+
+  var popToday = dl.precipitation_probability_max[dayIdx];
+  $('hero').className = 'card hero' + (day?'':' night');
+  $('hero').innerHTML =
+    '<div class="ico">'+icon(w[1],day)+'</div>'+
+    '<div class="now"><div class="temp">'+Math.round(cur.temperature_2m)+'<sup>°</sup></div>'+
+      '<div class="cond">'+w[0]+'</div>'+
+      '<div class="range">최저 <b>'+Math.round(dl.temperature_2m_min[dayIdx])+'°</b> · 최고 <b>'+Math.round(dl.temperature_2m_max[dayIdx])+'°</b></div></div>'+
+    '<div class="stats">'+
+      '<div class="stat"><span>체감</span><b>'+Math.round(cur.apparent_temperature)+'°</b></div>'+
+      '<div class="stat"><span>강수확률</span><b>'+(popToday==null?'–':popToday+'%')+'</b></div>'+
+      '<div class="stat"><span>습도</span><b>'+Math.round(cur.relative_humidity_2m)+'%</b></div>'+
+      '<div class="stat"><span>바람</span><b>'+cur.wind_speed_10m.toFixed(1)+'<small style="font-size:.6em;color:var(--sub)"> m/s</small></b></div>'+
+    '</div>';
+
+  var h='';
+  for(var k=0;k<8;k++){ var i=i0+k*2; if(i>=hr.time.length) break;
+    var ww=wmo(hr.weather_code[i]), pp=hr.precipitation_probability[i];
+    h+='<div class="h"><div class="t">'+hh(hr.time[i])+'시</div>'+icon(ww[1],hr.is_day[i]===1)+'<div class="d">'+Math.round(hr.temperature_2m[i])+'°</div><div class="p">'+(pp>=20?pp+'%':'')+'</div></div>';
+  }
+  $('hourly').innerHTML = h;
+
+  var WD=['일','월','화','수','목','금','토'], dd='';
+  for(var j=dayIdx;j<Math.min(dayIdx+5,dl.time.length);j++){
+    var p=dl.time[j].split('-'), wd=new Date(+p[0],+p[1]-1,+p[2]).getDay(), dw=wmo(dl.weather_code[j]), dp=dl.precipitation_probability_max[j];
+    dd+='<div class="dy">'+icon(dw[1],true)+'<div class="txt"><div class="w'+(wd===0?' sun':wd===6?' sat':'')+'">'+(j===dayIdx?'오늘':WD[wd])+'</div>'+
+        '<div class="mm"><span>'+Math.round(dl.temperature_2m_min[j])+'°</span> / '+Math.round(dl.temperature_2m_max[j])+'°</div>'+
+        '<div class="pp">'+(dp>=30?dp+'%':'')+'</div></div></div>';
+  }
+  $('daily').innerHTML = dd;
+  $('daily').style.setProperty('--days', String(Math.max(1, Math.min(dayIdx+5, dl.time.length) - dayIdx)));
+  renderTips({cur:cur, hr:hr, i0:i0, dl:dl, dayIdx:dayIdx});
+}
+// 예보 지역의 현재 시각 (기기 시간대와 지역 시간대가 달라도 맞도록)
+function placeNow(d){ var off = (d && typeof d.utc_offset_seconds==='number') ? d.utc_offset_seconds : -new Date().getTimezoneOffset()*60; return localIso(new Date(Date.now() + (off + new Date().getTimezoneOffset()*60)*1000)); }
+function localIso(dt){ var p=function(n){return (n<10?'0':'')+n;}; return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate())+'T'+p(dt.getHours())+':'+p(dt.getMinutes()); }
+
+/* ================= 그리기: 미세먼지 ================= */
+var worstDust = -1, whoOver = false;
+var WHO_LIMIT = {pm10:45, pm25:15};          // WHO 2021 권고(24시간 평균, µg/m³)
+function mean24(arr, i0){ var sum=0, n=0; for(var i=Math.max(0,i0-23); i<=i0; i++){ if(arr[i]!=null){ sum+=arr[i]; n++; } } return n>=18 ? sum/n : null; }
+function renderDust(){
+  var c = cache.air, model = c && c.key===locKey() ? c.data : null, real = airkData();
+  var v10=null, v25=null, a10=null, a25=null, n10=null, n25=null;
+  if(model){
+    var d=model, t=d.hourly.time, nowIso=placeNow(d).slice(0,13), i0=0;
+    while(i0<t.length-1 && t[i0].slice(0,13) < nowIso) i0++;
+    // 캐시가 한 시간 이상 지났으면 시간별 예보에서 지금 시각 값을 사용
+    var fresh = Date.now()-c.at < 70*60000;
+    v10 = fresh ? d.current.pm10 : d.hourly.pm10[i0]; v25 = fresh ? d.current.pm2_5 : d.hourly.pm2_5[i0];
+    var mx = function(arr){ var m=null; for(var i=i0+1;i<=Math.min(i0+12,arr.length-1);i++){ if(arr[i]!=null && (m==null||arr[i]>m)) m=arr[i]; } return m; };
+    n10 = mx(d.hourly.pm10); n25 = mx(d.hourly.pm2_5);
+    a10 = mean24(d.hourly.pm10, i0); a25 = mean24(d.hourly.pm2_5, i0);
+  }
+  if(real){        // 측정소 실측값이 있으면 현재값과 24시간 평균은 실측으로
+    if(real.pm10!=null){ v10=real.pm10; a10=real.avg10; n10=null; }
+    if(real.pm25!=null){ v25=real.pm25; a25=real.avg25; n25=null; }
+  }
+  $('dust').innerHTML = pmCard('미세먼지','PM10',v10,'pm10',n10,a10) + pmCard('초미세먼지','PM2.5',v25,'pm25',n25,a25);
+  worstDust = Math.max(v10==null?-1:grade('pm10',v10), v25==null?-1:grade('pm25',v25));
+  whoOver = (v10!=null && a10!=null && Math.round(a10)>WHO_LIMIT.pm10) || (v25!=null && a25!=null && Math.round(a25)>WHO_LIMIT.pm25);
+}
+function pmCard(name, sub, v, kind, next, avg){
+  if(v==null) return '<div class="pm"><div class="top"><div class="name">'+name+'<small>'+sub+'</small></div></div><div class="grade" style="font-size:2rem">불러오는 중…</div><div></div></div>';
+  var g=grade(kind,v), ng = next==null?null:grade(kind,next), lim=WHO_LIMIT[kind], over = avg!=null && Math.round(avg)>lim;
+  return '<div class="pm g'+g+'"><div class="top"><div class="name">'+name+'<small>'+sub+'</small></div><div class="val"><b>'+Math.round(v)+'</b>µg/m³</div></div>'+
+    '<div class="grade'+(g===3?' long':'')+'">'+GRADE[g]+'</div>'+
+    '<div><div class="bar"><s></s><s></s><s></s><s></s><em style="left:'+barPos(kind,v).toFixed(1)+'%"></em></div>'+
+    (ng==null ? (avg==null?'<div class="next">&nbsp;</div>':'') : '<div class="next"><span class="lg">앞으로 </span>12시간 최고 <span class="lg">예보 </span>'+Math.round(next)+' · '+GRADE[ng]+'</div>')+
+    (avg==null?'':'<div class="who'+(over?' over':'')+'"><span class="lg">24시간 </span>평균 '+Math.round(avg)+' · WHO <span class="lg">권고('+lim+') </span>'+(over?'초과':'이내')+'</div>')+
+    '</div></div>';
+}
+
+/* ================= 그리기: 외출 한마디 ================= */
+var tipCtx = null;
+function renderTips(ctx){
+  if(ctx) tipCtx = ctx; ctx = tipCtx; var tips=[];
+  if(ctx){
+    var hr=ctx.hr, wetAt=-1, popMax=0;
+    for(var i=ctx.i0-1;i<Math.min(ctx.i0+12,hr.time.length);i++){ if(i<0) continue;
+      var raw=hr.precipitation_probability[i], pp=raw||0, kind=wmo(hr.weather_code[i])[1], wetKind=WET[kind]||kind==='snow';
+      if(pp>popMax) popMax=pp;
+      if(wetAt<0 && (raw==null ? wetKind : (pp>=60 || (wetKind && pp>=40)))) wetAt=i;
+    }
+    var snowy = wetAt>=0 && wmo(hr.weather_code[wetAt])[1]==='snow';
+    var nowKind = wmo(ctx.cur.weather_code)[1];
+    if(nowKind==='snow') tips.push(['info','지금 눈이 와요 · 미끄럼 주의']);
+    else if(nowKind==='sleet') tips.push(['info','지금 비나 눈이 와요 · 우산 챙기세요']);
+    else if(WET[nowKind] || ctx.cur.precipitation>0) tips.push(['info','지금 비가 와요 · 우산 챙기세요']);
+    else if(wetAt>=0) tips.push(['info', hh(hr.time[wetAt])+'시쯤 '+(snowy?'눈':'비')+' 소식 · '+(snowy?'따뜻하게 입으세요':'우산 챙기세요')]);
+    var lo=ctx.dl.temperature_2m_min[ctx.dayIdx], hi=ctx.dl.temperature_2m_max[ctx.dayIdx];
+    if(hi>=33) tips.push(['alert','폭염 · 물 자주 드세요']);
+    else if(lo<=-10) tips.push(['alert','한파 · 단단히 입으세요']);
+    else if(lo<=0) tips.push(['warn','영하권 · 따뜻하게 입으세요']);
+    else if(hi-lo>=10) tips.push(['warn','일교차 '+Math.round(hi-lo)+'° · 겉옷 챙기세요']);
+  }
+  if(worstDust>=3) tips.unshift(['alert','미세먼지 매우나쁨 · 마스크 꼭 쓰세요']);
+  else if(worstDust===2) tips.unshift(['warn','미세먼지 나쁨 · 마스크 챙기세요']);
+  else if(whoOver) tips.push(['info','미세먼지 WHO 권고 초과 · 민감하면 마스크']);
+  if(!tips.length && ctx && worstDust>=0) tips.push(['','외출하기 좋은 날이에요']);
+  $('tips').innerHTML = tips.slice(0,3).map(function(t){ return '<div class="tip '+t[0]+'"><i></i>'+t[1]+'</div>'; }).join('');
+}
+
+/* ================= 그리기: 환율 ================= */
+var CUR = [['USD','🇺🇸 미국 달러',1],['JPY','🇯🇵 일본 엔 (100엔)',100],['EUR','🇪🇺 유로',1],['CNY','🇨🇳 중국 위안',1]];
+function spark(vals, cls){
+  if(!vals || vals.length<2) return '<svg viewBox="0 0 136 64"></svg>';
+  var mn=Math.min.apply(null,vals), mx=Math.max.apply(null,vals), sp=(mx-mn)||1, n=vals.length;
+  var pts=vals.map(function(v,i){ return (4+i*128/(n-1)).toFixed(1)+','+(58-(v-mn)/sp*52).toFixed(1); });
+  var col = cls==='up'?'var(--up)':cls==='down'?'var(--down)':'var(--sub)', last=pts[n-1].split(',');
+  return '<svg viewBox="0 0 136 64" preserveAspectRatio="none"><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="'+last[0]+'" cy="'+last[1]+'" r="3.5" fill="'+col+'"/></svg>';
+}
+// 거래일(한국 시각 기준, 새벽 3시 이전은 전날로, 주말은 금요일로)
+function tradeDay(ms){
+  var d=new Date(ms+9*3600000-3*3600000), w=d.getUTCDay();
+  if(w===6) d=new Date(d.getTime()-864e5); else if(w===0) d=new Date(d.getTime()-2*864e5);
+  return d.getUTCFullYear()+'-'+(d.getUTCMonth()<9?'0':'')+(d.getUTCMonth()+1)+'-'+(d.getUTCDate()<10?'0':'')+d.getUTCDate();
+}
+function fxLive(){ var l=cache.fxl; return l && l.data && Date.now()-l.at < 6*3600000 ? l : null; }      // 6시간 넘게 못 받으면 예비 값으로
+function renderFx(){
+  var hist=cache.fx&&cache.fx.data, live=fxLive(), blank=function(x){ return '<div class="card cur"><div class="nm">'+x[1]+'</div><div class="rate">–</div><div class="chg">&nbsp;</div></div>'; };
+  if(!hist && !live){ $('fx').innerHTML = CUR.map(blank).join(''); return; }
+  var days=cache.fxd&&cache.fxd.data||{}, today=tradeDay(Date.now()), prevKey=Object.keys(days).filter(function(k){ return k<today; }).sort().pop();
+  $('fx').innerHTML = CUR.map(function(x){
+    var s=(hist&&hist.series[x[0]]||[]).slice(), v, prev;
+    if(live && live.data[x[0]]>0){ v=live.data[x[0]]; prev=prevKey?days[prevKey][x[0]]:null; s.push(v); }      // 전일 대비는 이 화면이 직접 기록한 전 거래일 값과 비교
+    else { v=s[s.length-1]; prev=s.length>1?s[s.length-2]:null; }
+    if(v==null) return blank(x);
+    var diff = prev==null?null:v-prev, cls = diff==null||Math.abs(diff)<0.005?'':diff>0?'up':'down';
+    var chg = diff==null ? '&nbsp;' : (cls==='up'?'▲ ':cls==='down'?'▼ ':'– ')+Math.abs(diff).toFixed(2)+' ('+(diff>0?'+':diff<0?'−':'')+Math.abs(diff/prev*100).toFixed(2)+'%)';
+    return '<div class="card cur"><div class="nm">'+x[1]+'</div>'+spark(s,cls)+
+      '<div class="rate">'+v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2})+'<small>원</small></div>'+
+      '<div class="chg '+cls+'">'+chg+'</div></div>';
+  }).join('');
+  $('fxnote').textContent = live ? '네이버 · 하나은행 매매기준율 · '+clockText(new Date(live.at))+' 확인'
+    : (hist.date ? hist.date.slice(5).replace('-','/')+' 기준 · ' : '') + hist.source + ' · 하루 1회 갱신';
+}
+
+/* ================= 그리기: 뉴스 ================= */
+function ago(ts){ if(!ts) return ''; var m=Math.round((Date.now()-ts)/60000); if(m<1) return '방금'; if(m<60) return m+'분 전'; var h=Math.round(m/60); if(h<24) return h+'시간 전'; return Math.round(h/24)+'일 전'; }
+function renderNews(){
+  var c=cache.news, want=feedUrl();
+  if(!c || c.key!==want || !c.data.length){ return; }
+  $('news').innerHTML = c.data.slice(0,6).map(function(n,i){
+    var meta=[n.src, ago(n.ts)].filter(Boolean).join(' · ');
+    return '<div class="n"><div class="no">'+(i+1)+'</div><div><div class="tt">'+esc(n.title)+'</div>'+(meta?'<div class="mt">'+esc(meta)+'</div>':'')+'</div></div>';
+  }).join('');
+  $('newsnote').textContent = (FEEDS[cfg.feed]||FEEDS.google).label.split(' · ')[0] + ' · ' + clockText(new Date(c.at)) + ' 갱신';
+}
+
+/* ================= 불러오기 ================= */
+async function loadWeather(){
+  var key=locKey(), q='latitude='+cfg.lat+'&longitude='+cfg.lon+'&timezone=auto';
+  // 대기질과 날씨를 따로 받아, 먼저 도착한 것부터 화면에 표시
+  var airJob = get('https://air-quality-api.open-meteo.com/v1/air-quality?'+q+'&current=pm10,pm2_5&hourly=pm10,pm2_5&forecast_days=2&past_days=1')
+    .then(function(d){ if(!d.current||!('pm10' in d.current)||!d.hourly||!Array.isArray(d.hourly.pm10)||!Array.isArray(d.hourly.pm2_5)) throw new Error('shape'); put('air',d,key); return true; })
+    .catch(function(){ return false; })
+    .then(function(ok){ SAFE.renderDust(); SAFE.renderTips(); return ok; });
+  // 해외 예보 모델(Open-Meteo → MET Norway). 기상청 인증키가 없거나 기상청 호출이 실패했을 때 사용
+  var modelWx = function(){ return get('https://api.open-meteo.com/v1/forecast?'+q+'&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&hourly=temperature_2m,precipitation_probability,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=6&wind_speed_unit=ms', false, {tries:2, timeout:8000})
+    .then(function(d){ if(!d.current||typeof d.current.temperature_2m!=='number'||!d.hourly||!Array.isArray(d.hourly.temperature_2m)||!d.daily||!Array.isArray(d.daily.temperature_2m_max)) throw new Error('shape'); d.source='open-meteo'; put('wx',d,key); return true; })
+    .catch(function(){
+      // 예비 출처: 노르웨이 기상청(MET Norway). Open-Meteo 예보 서버에 연결되지 않을 때만 사용
+      return get('https://api.met.no/weatherapi/locationforecast/2.0/complete?lat='+cfg.lat.toFixed(4)+'&lon='+cfg.lon.toFixed(4), false, {tries:2, timeout:10000})
+        .then(function(j){ put('wx', fromMetNo(j), key); return true; });
+    }); };
+  var wxJob = (useKma()
+      ? loadKma().then(function(d){ put('wx',d,key); kmaState.ok=true; kmaState.msg='기상청 연결됨 · 실황 '+d.kmaObs+' 발표 기준'; return true; })
+          .catch(function(e){ kmaState.ok=false; kmaState.msg=kmaErrMsg(e); return modelWx(); })
+      : modelWx())
+    .catch(function(){ return false; })
+    .then(function(ok){ SAFE.renderWeather(); SAFE.renderTips(); renderStatus(); return ok; });
+  // 에어코리아 측정소 실측(20분 간격). 실패해도 위의 모델 값으로 계속 표시된다
+  if(useAirk() && airkDue()){
+    loadAirk().then(function(d){ put('airk', d, airkId()); airkState.msg='에어코리아 연결됨 · '+d.station+' 측정소 '+d.label+' 측정값'; })
+      .catch(function(e){ airkState.msg=airkErrMsg(e); })
+      .then(function(){ SAFE.renderDust(); SAFE.renderTips(); renderStatus(); });
+  }
+  var res = await Promise.all([wxJob, airJob]);
+  if(!res[0] && (!cache.wx || cache.wx.key!==key)) $('hero').innerHTML='<div class="empty">날씨를 불러오지 못했습니다.<br>Wi-Fi 연결을 확인해 주세요. 1분 뒤 다시 시도합니다.</div>';
+  return res[0] && res[1];
+}
+
+/* ================= 기상청 (공공데이터포털 · 단기예보 조회서비스) =================
+   초단기실황(관측 기반 현재 날씨) + 초단기예보(6시간) + 단기예보(3~4일)를 받아 이 화면 형식으로 합친다.
+   인증키는 설정 화면에서 입력하며 이 기기에만 저장된다. */
+var KMA_BASE = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/';
+var kmaState = {ok:false, msg:'', mem:{}};
+function kmaKeyVal(){ return String(cfg.kmaKey||'').replace(/\s+/g,''); }
+function useKma(){ return !!kmaKeyVal() && cfg.lat>=32.5 && cfg.lat<=39.5 && cfg.lon>=124 && cfg.lon<=132; }
+function showKmaMsg(){
+  var el=$('s-kmamsg'); if(!el) return;
+  el.textContent = !kmaKeyVal() ? '공공데이터포털(data.go.kr)에서 발급한 일반 인증키를 넣으면 날씨는 기상청 실황(관측), 미세먼지는 에어코리아 측정값으로 표시합니다. 키는 이 기기에만 저장됩니다.'
+    : !useKma() ? '기상청 자료는 국내 지역에서만 쓸 수 있어 해외 예보 모델로 표시합니다.'
+    : (kmaState.msg || '저장하면 기상청 연결을 확인합니다.');
+}
+function kmaErrMsg(e){
+  var k=e&&e.kma;
+  return k==='key' ? '인증키가 맞지 않거나 아직 활성화되지 않았습니다(발급 후 1~2시간 걸릴 수 있음). 지금은 예비 출처로 표시합니다.'
+    : k==='quota' ? '기상청 하루 호출 한도를 넘었습니다. 지금은 예비 출처로 표시합니다.'
+    : '기상청 서버에서 자료를 받지 못했습니다. 지금은 예비 출처로 표시하고 다음 갱신 때 다시 시도합니다.';
+}
+function kmaErr(kind, msg){ var e=new Error(msg||kind); e.kma=kind; return e; }
+// 위도·경도 → 기상청 5km 격자 (람베르트 정각원추도법, 기상청 공개 변환식)
+function kmaGrid(lat, lon){
+  var RE=6371.00877, GRID=5.0, SLAT1=30.0, SLAT2=60.0, OLON=126.0, OLAT=38.0, XO=43, YO=136, D=Math.PI/180;
+  var re=RE/GRID, s1=SLAT1*D, s2=SLAT2*D, olon=OLON*D, olat=OLAT*D;
+  var sn=Math.log(Math.cos(s1)/Math.cos(s2))/Math.log(Math.tan(Math.PI*0.25+s2*0.5)/Math.tan(Math.PI*0.25+s1*0.5));
+  var sf=Math.pow(Math.tan(Math.PI*0.25+s1*0.5),sn)*Math.cos(s1)/sn;
+  var ro=re*sf/Math.pow(Math.tan(Math.PI*0.25+olat*0.5),sn);
+  var ra=re*sf/Math.pow(Math.tan(Math.PI*0.25+lat*D*0.5),sn);
+  var th=lon*D-olon; if(th>Math.PI) th-=2*Math.PI; if(th<-Math.PI) th+=2*Math.PI; th*=sn;
+  return {nx:Math.floor(ra*Math.sin(th)+XO+0.5), ny:Math.floor(ro-ra*Math.cos(th)+YO+0.5)};
+}
+function p2(n){ return (n<10?'0':'')+n; }
+// 한국 시각 기준 발표시각 {date:'YYYYMMDD', time:'HHMM'}
+function kmaBase(ms, minute){ var d=new Date(ms+9*3600000); return {date:''+d.getUTCFullYear()+p2(d.getUTCMonth()+1)+p2(d.getUTCDate()), time:p2(d.getUTCHours())+p2(minute||0)}; }
+function kstDateKey(ms){ var d=new Date(ms+9*3600000); return d.getUTCFullYear()+'-'+p2(d.getUTCMonth()+1)+'-'+p2(d.getUTCDate()); }
+function kstHourKey(ms){ var d=new Date(ms+9*3600000); return kstDateKey(ms)+'T'+p2(d.getUTCHours())+':00'; }
+var H1=3600000;
+function hourFloor(ms){ return Math.floor(ms/H1)*H1; }
+// 받을 수 있는 가장 최근 발표시각부터 차례로 (아직 안 올라왔으면 그 앞 발표분을 받는다)
+function ncstCands(now){ var t=hourFloor(now-10*60000); return [kmaBase(t), kmaBase(t-H1), kmaBase(t-2*H1)]; }
+function ultraCands(now){ var t=hourFloor(now-45*60000); return [kmaBase(t,30), kmaBase(t-H1,30)]; }
+function vilageCands(now){
+  var out=[], t=hourFloor(now-10*60000);
+  for(var i=0;i<30 && out.length<2;i++){ var h=new Date(t-i*H1+9*H1).getUTCHours(); if(h%3===2) out.push(kmaBase(t-i*H1)); }
+  return out;
+}
+function dayCands(now){          // 오늘 하루 전체가 들어 있는 발표분: 오늘 02시, 없으면 어제 23시
+  var out=[], t=hourFloor(now-10*60000), today=kstDateKey(now);
+  for(var i=0;i<30 && out.length<2;i++){ var ms=t-i*H1, h=new Date(ms+9*H1).getUTCHours(); if((h===2 && kstDateKey(ms)===today) || (h===23 && kstDateKey(ms)!==today)) out.push(kmaBase(ms)); }
+  return out;
+}
+async function kmaCall(op, base, rows, pageNo){
+  var g=kmaGrid(cfg.lat,cfg.lon), key=kmaKeyVal();
+  var url=KMA_BASE+op+'?serviceKey='+(key.indexOf('%')>=0?key:encodeURIComponent(key))+'&pageNo='+(pageNo||1)+'&numOfRows='+rows+'&dataType=JSON&base_date='+base.date+'&base_time='+base.time+'&nx='+g.nx+'&ny='+g.ny;
+  var ctl=new AbortController(), tm=setTimeout(function(){ ctl.abort(); }, 12000), r, text;
+  try{ r=await fetch(url,{signal:ctl.signal, cache:'no-store'}); text=await r.text(); }
+  catch(e){ throw kmaErr('net'); }
+  finally{ clearTimeout(tm); }
+  var j=null; try{ j=JSON.parse(text); }catch(e){}
+  var head=j&&j.response&&j.response.header, code=head?String(head.resultCode):'';
+  if(code==='00' && j.response.body && j.response.body.items) return {items:[].concat(j.response.body.items.item||[]), total:+j.response.body.totalCount||0};
+  if(code==='03') throw kmaErr('nodata');
+  if(code==='22' || /LIMITED_NUMBER/.test(text)) throw kmaErr('quota');
+  if(code==='20'||code==='30'||code==='31'||code==='32'||code==='33' || r.status===401 || r.status===403 || /SERVICE[_ ]KEY|SERVICE[_ ]ACCESS[_ ]DENIED|접근거부|DEADLINE_HAS_EXPIRED|UNREGISTERED_IP/.test(text)) throw kmaErr('key');
+  throw kmaErr('net', 'HTTP '+r.status+' '+code);
+}
+// 후보 발표시각을 차례로 시도. slot을 주면 같은 발표분은 다시 받지 않는다(단기예보는 3시간마다만 바뀜)
+async function kmaFetch(op, cands, rows, slot, maxPages){
+  var g=kmaGrid(cfg.lat,cfg.lon), last=kmaErr('nodata');
+  for(var i=0;i<cands.length;i++){
+    var id=op+cands[i].date+cands[i].time+'@'+g.nx+','+g.ny+'#'+rows;
+    if(slot && kmaState.mem[slot] && kmaState.mem[slot].id===id) return kmaState.mem[slot].res;
+    try{
+      var res;
+      try{ res=await kmaCall(op,cands[i],rows,1); }
+      catch(e1){ if(e1.kma!=='net') throw e1; await sleep(1200); res=await kmaCall(op,cands[i],rows,1); }      // 연결 오류는 한 번 더
+      for(var pg=2; res.items.length<res.total && pg<=(maxPages||4); pg++){ var more=await kmaCall(op,cands[i],rows,pg); if(!more.items.length) break; res.items=res.items.concat(more.items); }
+      res.base=cands[i];
+      if(slot) kmaState.mem[slot]={id:id,res:res};
+      return res;
+    }catch(e){ last=e; if(e.kma!=='nodata') throw e; }
+  }
+  throw last;
+}
+function kmaNum(v){ var n=parseFloat(v); return (isNaN(n)||n<=-900||n>=900) ? null : n; }
+function kmaCode(pty, sky, lgt, rn1){
+  if(pty>0 && lgt>0) return 95;
+  if(pty===1) return rn1!=null && rn1>=15 ? 65 : rn1!=null && rn1<1 ? 61 : 63;
+  if(pty===2) return 68; if(pty===3) return 73; if(pty===4) return 80;
+  if(pty===5) return 150; if(pty===6) return 151; if(pty===7) return 152;
+  return sky===1 ? 0 : sky===3 ? 103 : sky===4 ? 3 : null;
+}
+var KIND_SEV = {thunder:9, snow:8, sleet:7, heavy:6, rain:5, drizzle:3};
+function pickDayCode(codes){        // 비·눈 소식이 있으면 그것을, 없으면 가장 잦은 하늘 상태를
+  var worst=null, cnt={}, best=null;
+  codes.forEach(function(c){ if(c==null) return; var sv=KIND_SEV[wmo(c)[1]]||0; if(sv>0 && (worst==null || sv>(KIND_SEV[wmo(worst)[1]]||0))) worst=c; cnt[c]=(cnt[c]||0)+1; if(best==null || cnt[c]>cnt[best]) best=c; });
+  return worst!=null ? worst : best!=null ? best : 3;
+}
+async function loadKma(){
+  var now=Date.now(), fatal=function(e){ if(e.kma==='key'||e.kma==='quota') throw e; return null; };
+  var r = await Promise.all([
+    kmaFetch('getUltraSrtNcst', ncstCands(now), 60),
+    kmaFetch('getUltraSrtFcst', ultraCands(now), 100).catch(fatal),          // 없어도 진행
+    kmaFetch('getVilageFcst', vilageCands(now), 1000, 'vf'),
+    kmaFetch('getVilageFcst', dayCands(now), 300, 'day', 1).catch(fatal)        // 없어도 진행
+  ]);
+  return buildKma(r[0], r[1], r[2], r[3], now);
+}
+function buildKma(ncst, ultra, vf, day, now){
+  var obs={}; ncst.items.forEach(function(it){ obs[it.category]=kmaNum(it.obsrValue); });
+  if(obs.T1H==null) throw kmaErr('net','no T1H');
+  var H={}, ext={}, today=kstDateKey(now), nowKey=kstHourKey(now);
+  var add=function(res, onlyDate){ if(!res) return; res.items.forEach(function(it){
+    var date=String(it.fcstDate||''), time=String(it.fcstTime||''); if(date.length!==8 || time.length<4) return;
+    var dk=date.slice(0,4)+'-'+date.slice(4,6)+'-'+date.slice(6,8); if(onlyDate && dk!==onlyDate) return;
+    var v=kmaNum(it.fcstValue), c=it.category; if(v==null) return;
+    if(c==='TMN'||c==='TMX'){ (ext[dk]=ext[dk]||{})[c]=v; return; }
+    var o=H[dk+'T'+time.slice(0,2)+':00']||(H[dk+'T'+time.slice(0,2)+':00']={});
+    if(c==='TMP'||c==='T1H') o.t=v; else if(c==='POP') o.pop=v; else if(c==='SKY') o.sky=v; else if(c==='PTY') o.pty=v; else if(c==='LGT') o.lgt=v;
+  }); };
+  add(day, today); add(vf); add(ultra);                  // 뒤에 넣는 것이 더 최근 발표라 앞의 값을 덮어쓴다
+  var keys=Object.keys(H).filter(function(k){ return H[k].t!=null; }).sort(), prev=2;
+  var hr={time:[],temperature_2m:[],precipitation_probability:[],weather_code:[],is_day:[]}, byDay={};
+  keys.forEach(function(k){
+    var o=H[k], code=kmaCode(o.pty||0, o.sky, o.lgt||0, null); if(code==null) code=prev; prev=code; o.code=code;
+    var ms=Date.parse(k+':00+09:00');
+    hr.time.push(k); hr.temperature_2m.push(o.t); hr.precipitation_probability.push(o.pop==null?null:o.pop); hr.weather_code.push(code); hr.is_day.push(isNight(ms)?0:1);
+    (byDay[k.slice(0,10)]=byDay[k.slice(0,10)]||[]).push({k:k, h:+k.slice(11,13), o:o});
+  });
+  if(hr.time.filter(function(k){ return k>nowKey; }).length<6) throw kmaErr('net','short forecast');
+  // 현재: 강수형태는 실황(관측), 하늘상태는 실황에 없어 가장 가까운 예보 시각 값을 쓴다
+  var near=H[nowKey]||H[kstHourKey(now+H1)]||{}, pty=obs.PTY||0;
+  var curCode=kmaCode(pty, near.sky, pty>0?(near.lgt||0):0, obs.RN1); if(curCode==null) curCode=near.code!=null?near.code:2;
+  var rh=obs.REH, ws=obs.WSD==null?0:obs.WSD;
+  var dl={time:[],weather_code:[],temperature_2m_max:[],temperature_2m_min:[],precipitation_probability_max:[]};
+  Object.keys(byDay).sort().forEach(function(dk){
+    if(dk<today) return;
+    var list=byDay[dk], e=ext[dk]||{}, isToday=dk===today;
+    if(!isToday && list.length<8 && !(e.TMN!=null && e.TMX!=null)) return;          // 끝부분만 걸친 날은 뺀다
+    var temps=list.map(function(x){ return x.o.t; }); if(isToday) temps.push(obs.T1H);
+    if(e.TMN!=null) temps.push(e.TMN); if(e.TMX!=null) temps.push(e.TMX);
+    var use=isToday ? list.filter(function(x){ return x.k>=nowKey; }) : list.filter(function(x){ return x.h>=6; });
+    if(!use.length) use=list;
+    var pops=use.map(function(x){ return x.o.pop; }).filter(function(v){ return v!=null; });
+    var codes=use.map(function(x){ return x.o.code; }); if(isToday) codes.push(curCode);
+    dl.time.push(dk); dl.weather_code.push(pickDayCode(codes));
+    dl.temperature_2m_max.push(Math.max.apply(null,temps)); dl.temperature_2m_min.push(Math.min.apply(null,temps));
+    dl.precipitation_probability_max.push(pops.length?Math.max.apply(null,pops):null);
+  });
+  if(!dl.time.length || dl.time[0]!==today) throw kmaErr('net','no today');
+  return {
+    source:'kma', utc_offset_seconds:32400, kmaObs:ncst.base.time.slice(0,2)+':'+ncst.base.time.slice(2),
+    current:{ time:nowKey, temperature_2m:obs.T1H, relative_humidity_2m:rh==null?0:rh,
+      apparent_temperature: rh==null ? obs.T1H : feelsLike(obs.T1H, rh, ws),
+      precipitation:obs.RN1||0, weather_code:curCode, wind_speed_10m:ws, is_day:isNight(now)?0:1 },
+    hourly:hr, daily:dl
+  };
+}
+
+/* ================= 에어코리아 (공공데이터포털 · 한국환경공단 대기오염정보) =================
+   설정에서 고른 측정소의 실측값. 인증키는 기상청과 같은 키를 쓴다. */
+var AIRK_BASE = 'https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/';
+var airkState = {msg:''};
+var SIDO = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+var SIDO_CITY = {'경기':'수원 성남 고양 용인 부천 안산 안양 남양주 화성 평택 의정부 파주 김포 광명 하남','강원':'춘천 원주 강릉','충북':'청주 충주','충남':'천안 아산','전북':'전주 군산 익산','전남':'목포 여수 순천','경북':'포항 경주 구미 안동','경남':'창원 진주 김해 양산 거제','제주':'서귀포'};
+function guessSido(lat, lon){            // 지역 목록에서 가장 가까운 도시가 속한 시도
+  var best=null, bd=1e9; PRESETS.forEach(function(p){ var d=(p[1]-lat)*(p[1]-lat)+(p[2]-lon)*(p[2]-lon); if(d<bd){ bd=d; best=p[0]; } });
+  var city=String(best||'').split(' ')[0]; if(SIDO.indexOf(city)>=0) return city;
+  for(var k in SIDO_CITY){ if((' '+SIDO_CITY[k]+' ').indexOf(' '+city+' ')>=0) return k; }
+  return '';
+}
+function airkId(){ return (cfg.sido||'')+'/'+(cfg.station||''); }
+function useAirk(){ return !!kmaKeyVal() && !!cfg.station; }
+function airkDue(){ var c=cache.airk; return !c || c.key!==airkId() || Date.now()-c.at > 19*60000; }
+function airkData(){                      // 3시간 이내의 실측값만 사용
+  var c=cache.airk; if(!useAirk() || !c || c.key!==airkId() || !c.data) return null;
+  return Date.now()-c.data.ts < 3.5*H1 ? c.data : null;
+}
+function airkErrMsg(e){
+  var k=e&&e.kma;
+  return k==='key' ? '인증키가 맞지 않거나 에어코리아 활용신청이 아직 반영되지 않았습니다. 지금은 예측 모델 값으로 표시합니다.'
+    : k==='quota' ? '에어코리아 하루 호출 한도를 넘었습니다. 지금은 예측 모델 값으로 표시합니다.'
+    : k==='nodata' ? '이 측정소의 최근 측정값이 없습니다. 지금은 예측 모델 값으로 표시합니다.'
+    : '에어코리아에서 자료를 받지 못했습니다. 지금은 예측 모델 값으로 표시하고 다음 갱신 때 다시 시도합니다.';
+}
+async function airkCall(op, params, keyOverride){
+  var key=String(keyOverride!=null?keyOverride:kmaKeyVal()).replace(/\s+/g,'');
+  var url=AIRK_BASE+op+'?serviceKey='+(key.indexOf('%')>=0?key:encodeURIComponent(key))+'&returnType=json&pageNo=1&'+params;
+  var ctl=new AbortController(), tm=setTimeout(function(){ ctl.abort(); }, 12000), r, text;
+  try{ r=await fetch(url,{signal:ctl.signal, cache:'no-store'}); text=await r.text(); }
+  catch(e){ throw kmaErr('net'); }
+  finally{ clearTimeout(tm); }
+  var j=null; try{ j=JSON.parse(text); }catch(e){}
+  var head=j&&j.response&&j.response.header, code=head?String(head.resultCode):'';
+  if(code==='00' && j.response.body) return [].concat(j.response.body.items||[]);
+  if(code==='03') throw kmaErr('nodata');
+  if(code==='22' || /LIMITED_NUMBER/.test(text)) throw kmaErr('quota');
+  if(code==='20'||code==='30'||code==='31'||code==='32'||code==='33' || r.status===401 || r.status===403 || /SERVICE[_ ]KEY|SERVICE[_ ]ACCESS[_ ]DENIED|접근거부|DEADLINE_HAS_EXPIRED|UNREGISTERED_IP/.test(text)) throw kmaErr('key');
+  throw kmaErr('net', 'HTTP '+r.status+' '+code);
+}
+function airkNum(v){ var n=parseFloat(v); return (isNaN(n)||n<0) ? null : n; }
+function airkTime(str){                   // 'YYYY-MM-DD HH:MM' (자정은 24:00으로 온다) → 시각(ms)
+  var m=/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})/.exec(String(str||'')); if(!m) return 0;
+  return Date.parse(m[1]+'T00:00:00+09:00') + (+m[2])*H1 + (+m[3])*60000;
+}
+async function loadAirk(){
+  var station=cfg.station;
+  var items=await airkCall('getMsrstnAcctoRltmMesureDnsty', 'numOfRows=30&dataTerm=DAILY&ver=1.3&stationName='+encodeURIComponent(station));
+  items=items.map(function(it){ return {ts:airkTime(it.dataTime), pm10:airkNum(it.pm10Value), pm25:airkNum(it.pm25Value), p10:airkNum(it.pm10Value24), p25:airkNum(it.pm25Value24)}; })
+             .filter(function(x){ return x.ts>0; }).sort(function(a,b){ return b.ts-a.ts; });
+  if(!items.length) throw kmaErr('nodata');
+  var latest=items[0].ts, recent=items.filter(function(x){ return latest-x.ts < 3*H1; });       // 점검 등으로 비면 직전 1~2시간 값
+  var pick=function(k){ for(var i=0;i<recent.length;i++){ if(recent[i][k]!=null) return recent[i]; } return null; };
+  var i10=pick('pm10'), i25=pick('pm25');
+  if(!i10 && !i25) throw kmaErr('nodata');
+  var day=items.filter(function(x){ return latest-x.ts < 24*H1; });
+  var avg=function(k, fallback){ var v=day.map(function(x){ return x[k]; }).filter(function(n){ return n!=null; }); return v.length>=18 ? v.reduce(function(a,b){ return a+b; },0)/v.length : fallback; };
+  var ts=(i25||i10).ts, d=new Date(ts+9*H1);
+  if(Date.now()-ts > 3.5*H1) throw kmaErr('nodata');
+  return {station:station, ts:ts, label:p2(d.getUTCHours())+':'+p2(d.getUTCMinutes()),
+    pm10:i10?i10.pm10:null, pm25:i25?i25.pm25:null,
+    avg10:avg('pm10', items[0].p10), avg25:avg('pm25', items[0].p25)};
+}
+
+/* MET Norway 응답을 이 화면이 쓰는 형식으로 변환 */
+function metCode(sym){
+  var s=String(sym||'').split('_')[0];
+  if(/thunder/.test(s)) return 95;
+  if(/sleet/.test(s)) return 66;
+  if(/snow/.test(s)) return /heavy/.test(s)?75:/light/.test(s)?71:73;
+  if(/rainshowers/.test(s)) return /heavy/.test(s)?82:80;
+  if(/rain/.test(s)) return /heavy/.test(s)?65:/light/.test(s)?61:63;
+  if(s==='fog') return 45; if(s==='cloudy') return 3; if(s==='partlycloudy') return 2; if(s==='fair') return 1;
+  return 0;
+}
+function feelsLike(t, rh, ws){ var e = rh/100*6.105*Math.exp(17.27*t/(237.7+t)); return t + 0.33*e - 0.70*ws - 4.0; }
+function fromMetNo(j){
+  var ts=j.properties.timeseries; if(!ts||!ts.length) throw new Error('shape');
+  var p2=function(n){ return (n<10?'0':'')+n; };
+  var isDay=function(sym,dt){ return /_night$/.test(sym)?0 : /_(day|polartwilight)$/.test(sym)?1 : (dt.getHours()>=7&&dt.getHours()<18?1:0); };
+  var H={time:[],temperature_2m:[],precipitation_probability:[],weather_code:[],is_day:[]}, days={}, order=[];
+  ts.forEach(function(x){
+    var dt=new Date(x.time), dkey=dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate()), det=x.data.instant.details;
+    var blk=x.data.next_1_hours||x.data.next_6_hours, sym=(blk&&blk.summary&&blk.summary.symbol_code)||'';
+    var d=days[dkey]; if(!d){ d=days[dkey]={min:Infinity,max:-Infinity,codes:[],any:null}; order.push(dkey); }
+    var lo=det.air_temperature, hi=det.air_temperature, six=x.data.next_6_hours&&x.data.next_6_hours.details;
+    if(!x.data.next_1_hours && six && typeof six.air_temperature_min==='number'){ lo=Math.min(lo,six.air_temperature_min); hi=Math.max(hi,six.air_temperature_max); }
+    d.min=Math.min(d.min,lo); d.max=Math.max(d.max,hi);
+    if(sym){ var code=metCode(sym); if(d.any==null) d.any=code; if(dt.getHours()>=6&&dt.getHours()<=21) d.codes.push(code); }
+    if(x.data.next_1_hours){ H.time.push(dkey+'T'+p2(dt.getHours())+':00'); H.temperature_2m.push(det.air_temperature); H.precipitation_probability.push(null); H.weather_code.push(metCode(sym)); H.is_day.push(isDay(sym,dt)); }
+  });
+  if(H.time.length<8) throw new Error('shape');
+  var sev=function(c){ return c>=95?9 : (c>=71&&c<=77)?8 : c===66?7 : (c===65||c===82)?6 : (c===63||c===80)?5 : c===61?4 : 0; };
+  var dayCode=function(d){
+    var list=d.codes.length?d.codes:(d.any==null?[3]:[d.any]), worst=list[0], cnt={}, best=list[0];
+    list.forEach(function(c){ if(sev(c)>sev(worst)) worst=c; cnt[c]=(cnt[c]||0)+1; if(cnt[c]>cnt[best]) best=c; });
+    return sev(worst)>0 ? worst : best;      // 비·눈 소식이 있으면 그것을, 없으면 가장 잦은 하늘 상태를
+  };
+  var c=ts[0], cd=c.data.instant.details, cb=c.data.next_1_hours||c.data.next_6_hours||{}, csym=(cb.summary&&cb.summary.symbol_code)||'';
+  return {
+    source:'metno', utc_offset_seconds:-new Date().getTimezoneOffset()*60,
+    current:{ time:H.time[0], temperature_2m:cd.air_temperature, relative_humidity_2m:cd.relative_humidity,
+      apparent_temperature: typeof cd.apparent_air_temperature==='number' ? cd.apparent_air_temperature : feelsLike(cd.air_temperature, cd.relative_humidity, cd.wind_speed),
+      precipitation:(cb.details&&cb.details.precipitation_amount)||0, weather_code:metCode(csym), wind_speed_10m:cd.wind_speed, is_day:isDay(csym,new Date()) },
+    hourly:H,
+    daily:{ time:order, weather_code:order.map(function(k){ return dayCode(days[k]); }),
+      temperature_2m_max:order.map(function(k){ return days[k].max; }), temperature_2m_min:order.map(function(k){ return days[k].min; }),
+      precipitation_probability_max:order.map(function(){ return null; }) }
+  };
+}
+// 네이버 환율(하나은행 매매기준율). 네이버 검색 환율 계산기가 쓰는 주소로, 공식 공개 API는 아니다.
+function naverFx(code, amount){
+  return new Promise(function(resolve, reject){
+    var cb='__fx'+code+Date.now().toString(36), sc=document.createElement('script'), done=false;
+    var finish=function(err, val){ if(done) return; done=true; clearTimeout(tm); window[cb]=function(){}; if(sc.parentNode) sc.parentNode.removeChild(sc); if(err) reject(err); else resolve(val); };
+    var tm=setTimeout(function(){ finish(new Error('timeout')); }, 10000);
+    window[cb]=function(d){ try{ var v=parseFloat(String(d.country[1].value).replace(/,/g,'')); if(!(v>0)) throw 0; finish(null, v); }catch(e){ finish(new Error('shape')); } };
+    sc.onerror=function(){ finish(new Error('script')); };
+    sc.src='https://m.search.naver.com/p/csearch/content/qapirender.nhn?key=calculator&pkid=141&q=%ED%99%98%EC%9C%A8&where=m&u1=keb&u6=standardUnit&u7=0&u3='+code+'&u4=KRW&u8=down&u2='+amount+'&_callback='+cb;
+    document.head.appendChild(sc);
+  });
+}
+var FX_RANGE = {USD:[500,3500], JPY:[300,2500], EUR:[500,4000], CNY:[50,600]};          // 엉뚱한 값 걸러내기
+async function loadFxLive(){
+  try{
+    var vals = await Promise.all(CUR.map(function(x){ return naverFx(x[0], x[2]); })), o={};
+    CUR.forEach(function(x,i){ var r=FX_RANGE[x[0]]; if(!(vals[i]>=r[0] && vals[i]<=r[1])) throw new Error('range'); o[x[0]]=vals[i]; });
+    put('fxl', o);
+    var days=cache.fxd&&cache.fxd.data||{}; days[tradeDay(Date.now())]=o;
+    Object.keys(days).sort().slice(0,-10).forEach(function(k){ delete days[k]; });
+    put('fxd', days);
+    return true;
+  }catch(e){ return false; }
+}
+// 추세선과 예비 값: 유럽중앙은행 기준환율(하루 1회)
+async function loadFxHistory(){
+  var names=['USD','JPY','EUR','CNY'], mult={USD:1,JPY:100,EUR:1,CNY:1};
+  try{
+    var from = new Date(Date.now()-45*864e5).toISOString().slice(0,10);
+    var d = await get('https://api.frankfurter.dev/v1/'+from+'..?base=USD&symbols=KRW,JPY,EUR,CNY');
+    var dates = Object.keys(d.rates).sort(), series={USD:[],JPY:[],EUR:[],CNY:[]};
+    dates.forEach(function(dt){ var r=d.rates[dt]; if(!r||!r.KRW) return;
+      series.USD.push(r.KRW); ['JPY','EUR','CNY'].forEach(function(c){ if(r[c]) series[c].push(r.KRW/r[c]*mult[c]); }); });
+    if(!series.USD.length) throw new Error('empty');
+    put('fx',{series:series, date:dates[dates.length-1], source:'유럽중앙은행 기준환율'});
+  }catch(e){
+    try{
+      var e2 = await get('https://open.er-api.com/v6/latest/USD'); if(!e2.rates||!e2.rates.KRW) throw new Error('shape');
+      var s2={}; names.forEach(function(c){ var v = c==='USD' ? e2.rates.KRW : e2.rates.KRW/e2.rates[c]*mult[c]; s2[c]=[v]; });
+      put('fx',{series:s2, date:new Date(e2.time_last_update_unix*1000).toISOString().slice(0,10), source:'ExchangeRate-API'});
+    }catch(e3){ return false; }
+  }
+  return true;
+}
+async function loadFx(){
+  var histFresh = cache.fx && Date.now()-cache.fx.at < 60*60000;
+  var res = await Promise.all([loadFxLive(), histFresh ? true : loadFxHistory()]);
+  SAFE.renderFx(); renderStatus();
+  return res[0] || res[1];
+}
+// 평일(장중)에는 5분마다, 주말에는 1시간마다
+function fxEvery(){ var d=new Date(Date.now()+6*3600000), w=d.getUTCDay(); return (w===0||w===6) ? 60*60000 : 5*60000; }
+function feedUrl(){ return cfg.feed==='custom' ? (cfg.custom||'') : (FEEDS[cfg.feed]||FEEDS.google).url; }
+function splitSrc(title, src){ // "제목 - 언론사" 형태(Google 뉴스)에서 언론사 분리
+  var i=title.lastIndexOf(' - '); if(i>0 && title.length-i<=30) return {title:title.slice(0,i).trim(), src:src||title.slice(i+3).trim()};
+  return {title:title.trim(), src:src||''};
+}
+async function loadNews(){
+  var url=feedUrl(); if(!/^https?:\/\//.test(url)){ $('news').innerHTML='<div class="empty">설정에서 뉴스 RSS 주소를 입력해 주세요.</div>'; return true; }
+  var items=null;
+  try{
+    var j = await get('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(url));
+    if(j.status!=='ok' || !j.items || !j.items.length) throw new Error('rss2json');
+    items = j.items.map(function(it){ var s=splitSrc(it.title||'', it.author||''); s.ts = Date.parse(String(it.pubDate||'').replace(' ','T')+'Z')||0; if(!s.src && j.feed) s.src=(j.feed.title||'').split(/[-|:]/)[0].trim(); return s; });
+  }catch(e){
+    try{
+      var xml = await get('https://api.allorigins.win/raw?url='+encodeURIComponent(url), true);
+      var doc = new DOMParser().parseFromString(xml,'text/xml'), ft=(doc.querySelector('channel > title')||{}).textContent||'';
+      items = Array.prototype.map.call(doc.querySelectorAll('item'), function(it){
+        var g=function(sel){ var n=it.querySelector(sel); return n?n.textContent:''; };
+        var s=splitSrc(g('title'), g('source')); s.ts=Date.parse(g('pubDate'))||0; if(!s.src) s.src=ft.split(/[-|:]/)[0].trim(); return s; });
+      if(!items.length) throw new Error('empty');
+    }catch(e2){
+      if(!cache.news || cache.news.key!==url) $('news').innerHTML='<div class="empty">뉴스를 불러오지 못했습니다.<br>잠시 뒤 다시 시도합니다.</div>';
+      return false;
+    }
+  }
+  put('news', items.filter(function(n){ return n.title; }).slice(0,10), url);
+  SAFE.renderNews(); return true;
+}
+
+/* 한 영역에서 오류가 나도 다른 영역은 계속 그려지도록 보호 */
+[['renderWeather',renderWeather],['renderDust',renderDust],['renderTips',renderTips],['renderFx',renderFx],['renderNews',renderNews]].forEach(function(p){ SAFE[p[0]] = function(a){ try{ return p[1](a); }catch(e){ if(window.console) console.warn(p[0], e); } }; });
+
+/* ================= 갱신 일정 ================= */
+var EVERY = {wx:10*60000, fx:60*60000, news:20*60000}, nextAt = {wx:0, fx:0, news:0}, busy = {};
+function due(kind, fn){
+  if(busy[kind] || Date.now()<nextAt[kind]) return;
+  if(navigator.onLine===false){ return; }
+  busy[kind]=true;
+  fn().then(function(ok){ nextAt[kind] = Date.now() + (ok ? (kind==='fx' ? fxEvery() : EVERY[kind]) : 60000); })
+      .catch(function(){ nextAt[kind] = Date.now()+60000; })
+      .then(function(){ busy[kind]=false; });
+}
+function refresh(){ due('wx',loadWeather); due('fx',loadFx); due('news',loadNews); }
+
+/* ================= 시계 · 상태 ================= */
+function clockText(d){ var h=d.getHours(), m=d.getMinutes(); return (h<12?'오전 ':'오후 ')+((h%12)||12)+':'+(m<10?'0':'')+m; }
+var lastMin=-1, loadedAt=Date.now(), wakeUntil=0;
+function tick(){
+  var d=new Date(), m=d.getMinutes();
+  if(m!==lastMin){
+    lastMin=m;
+    var h=d.getHours();
+    $('ampm').textContent = h<12?'오전':'오후';
+    $('clock').textContent = ((h%12)||12)+':'+(m<10?'0':'')+m;
+    $('date').textContent = (d.getMonth()+1)+'월 '+d.getDate()+'일 '+['일','월','화','수','목','금','토'][d.getDay()]+'요일';
+    refresh(); renderStatus(); applyTheme();
+    if(m%10===0){ SAFE.renderWeather(); SAFE.renderDust(); SAFE.renderTips(); SAFE.renderNews(); }      // 시간 흐름 반영(지나간 예보 정리)
+    // 하루 한 번(새벽 4시대) 페이지 새로 고침: 오래 켜 둔 화면 정리
+    if(h===4 && Date.now()-loadedAt>6*3600000 && navigator.onLine!==false) hardReload();
+  }
+  var hNow=d.getHours(), night = cfg.dim && (hNow>=23 || hNow<6) && Date.now()>wakeUntil && !$('sheet').classList.contains('open');
+  document.body.classList.toggle('dim', !!night);
+  var idle = Date.now() - Math.max(lastTouch, mapTouchAt ? mapTouchAt+3*60000 : 0);        // 지도를 조작하는 동안에는 5분쯤 더 기다린다
+  if(cfg.back>0 && page()!==0 && idle>cfg.back*1000) go(0);
+}
+function renderStatus(){
+  var c=cache.wx, el=$('upd');
+  var srcName = c&&c.key===locKey() ? c.data.source : '';
+  $('src').textContent = '날씨 '+(srcName==='kma' ? '기상청' : srcName==='metno' ? 'MET Norway(예비)' : 'Open-Meteo'+(useKma()&&srcName?'(예비)':''))+' · 대기질 '+(airkData() ? '에어코리아('+cfg.station+')' : 'Open-Meteo'+(useAirk()?'(예비)':''))+' · 환율 '+(fxLive() ? '네이버' : '유럽중앙은행');
+  showKmaMsg();
+  if(!c || c.key!==locKey()){ el.textContent=''; return; }
+  var stale = Date.now()-c.at > 35*60000;
+  el.className = 'upd'+(stale?' stale':'');
+  el.textContent = (stale?'갱신 지연 · 마지막 ':'')+clockText(new Date(c.at))+(stale?'':' 갱신');
+}
+
+/* ================= 넘기기 ================= */
+var pager=$('pager'), lastTouch=Date.now();
+function page(){ return Math.round(pager.scrollLeft/Math.max(1,pager.clientWidth)); }
+function go(i){ pager.scrollTo({left:i*pager.clientWidth, behavior:'smooth'}); }
+function syncDots(){ var p=page(); Array.prototype.forEach.call($('dots').children,function(el,i){ el.classList.toggle('on', i===p); }); }
+pager.addEventListener('scroll', function(){ syncDots(); syncMap(); }, {passive:true});
+var PAGES = 3, MAP_PAGE = 1;
+/* 2쪽 지도: 그 화면을 보고 있을 때만 불러오고, 떠나면 20초 뒤 내려서 발열과 전력 소모를 줄인다 */
+var mapOn=false, mapTimer=null, mapTouchAt=0;
+function mapUrl(){ return 'https://earth.nullschool.net/#current/particulates/surface/level/overlay=pm2.5/orthographic='+(cfg.lon-360).toFixed(2)+','+cfg.lat.toFixed(2)+',6500/loc='+cfg.lon.toFixed(3)+','+cfg.lat.toFixed(3); }
+function setMapSrc(url){ var f=$('mapframe'); try{ f.contentWindow.location.replace(url); }catch(e){ f.src=url; } }
+function setMapTouch(on){ mapTouchAt = on ? Date.now() : 0; $('mapcard').classList.toggle('touch', !!on); $('maptouch').classList.toggle('act', !!on); $('maptouch').textContent = on ? '조작 끝내기' : '지도 조작'; }
+function mapOff(){ clearTimeout(mapTimer); if(mapOn){ setMapSrc('about:blank'); mapOn=false; } $('mapcard').classList.remove('on'); setMapTouch(false); }
+function syncMap(){
+  var want = page()===MAP_PAGE && !document.hidden;
+  if(want && mapTimer && mapOn){ clearTimeout(mapTimer); mapTimer=null; }                 // 내리려던 것을 취소
+  if(want && !mapOn && !mapTimer) mapTimer=setTimeout(function(){ mapTimer=null; if(page()!==MAP_PAGE || document.hidden) return; setMapSrc(mapUrl()); mapOn=true; setTimeout(function(){ if(mapOn) $('mapcard').classList.add('on'); }, 1500); }, 500);
+  if(!want && mapOn && !mapTimer) mapTimer=setTimeout(function(){ mapTimer=null; if(page()===MAP_PAGE && !document.hidden) return; mapOff(); }, 20000);
+  if(!want && mapTouchAt) setMapTouch(false);
+}
+$('maptouch').addEventListener('click', function(){ setMapTouch(!mapTouchAt); lastTouch=Date.now(); });
+// 덮개 위에서 옆으로 민 동작은 직접 계산해 넘긴다(기기에 따라 iframe 위에서는 기본 넘김이 동작하지 않음)
+(function(){
+  var sh=$('mapshield'), st=null;
+  sh.addEventListener('touchstart', function(e){ st = e.touches.length===1 ? {x:e.touches[0].clientX, y:e.touches[0].clientY, p:page(), t:Date.now()} : null; }, {passive:true});
+  sh.addEventListener('touchend', function(e){
+    if(!st || !e.changedTouches.length) return;
+    var dx=e.changedTouches[0].clientX-st.x, dy=e.changedTouches[0].clientY-st.y, p=st.p; st=null;
+    if(Math.abs(dx)>=45 && Math.abs(dx)>Math.abs(dy)*1.3) go(Math.max(0, Math.min(PAGES-1, p+(dx<0?1:-1))));       // 시작한 쪽 기준으로 한 장만
+  }, {passive:true});
+  sh.addEventListener('touchcancel', function(){ st=null; }, {passive:true});
+})();
+['touchstart','pointerdown','keydown'].forEach(function(ev){ window.addEventListener(ev,function(){ lastTouch=Date.now(); },{passive:true}); });
+$('dots').addEventListener('click', function(){ go((page()+1)%PAGES); });
+window.addEventListener('keydown', function(e){ if(e.key==='ArrowRight') go(Math.min(PAGES-1,page()+1)); if(e.key==='ArrowLeft') go(Math.max(0,page()-1)); });
+window.addEventListener('resize', function(){ var p=page(); pager.scrollTo({left:p*pager.clientWidth}); });
+$('dimmer').addEventListener('click', function(){ wakeUntil=Date.now()+60000; document.body.classList.remove('dim'); });
+
+/* ================= 설정 화면 ================= */
+function openSettings(){
+  var ps=$('s-preset'); ps.innerHTML='<option value="">— 지역 선택 —</option>'+PRESETS.map(function(p,i){ return '<option value="'+i+'">'+p[0]+'</option>'; }).join('');
+  var fs=$('s-feed'); fs.innerHTML=Object.keys(FEEDS).map(function(k){ return '<option value="'+k+'">'+FEEDS[k].label+'</option>'; }).join('');
+  $('s-name').value=cfg.name; $('s-lat').value=cfg.lat; $('s-lon').value=cfg.lon; fs.value=cfg.feed; $('s-custom').value=cfg.custom;
+  $('s-dim').value=cfg.dim?'1':'0'; $('s-back').value=String(cfg.back); $('s-theme').value=mode(); $('s-design').value=THIS_DESIGN;
+  $('s-kma').value=cfg.kmaKey||''; showKmaMsg();
+  $('s-sido').innerHTML='<option value="">— 시도 —</option>'+SIDO.map(function(n){ return '<option>'+n+'</option>'; }).join('');
+  $('s-sido').value=cfg.sido||guessSido(cfg.lat,cfg.lon);
+  $('s-station').innerHTML='<option value="">— 측정소 —</option>'+(cfg.station?'<option selected>'+esc(cfg.station)+'</option>':'');
+  $('s-airmsg').textContent = !kmaKeyVal() ? '인증키를 넣은 뒤 시도를 고르면 측정소 목록이 나옵니다. 고르지 않으면 예측 모델 값으로 표시합니다.' : (cfg.station ? (airkState.msg||'') : '집에서 가까운 측정소를 고르고 저장하세요.');
+  if(kmaKeyVal() && $('s-sido').value) loadStations();
+  var st=sunTimes(new Date(), cfg.lat, cfg.lon);
+  $('s-sun').textContent = st.polar ? '' : '오늘 '+cfg.name+' 일출 '+clockText(new Date(st.rise))+' · 일몰 '+clockText(new Date(st.set));
+  $('sheet').classList.add('open');
+}
+$('gear').addEventListener('click', openSettings);
+var THIS_DESIGN='classic';
+function switchDesign(d){ cfg.design = d==='classic' ? 'classic' : 'scene'; store.set('door.cfg',cfg); location.replace(cfg.design==='classic' ? 'classic.html' : 'index.html'); }
+$('designbtn').addEventListener('click', function(){ switchDesign(THIS_DESIGN==='classic' ? 'scene' : 'classic'); });
+$('themebtn').addEventListener('click', function(){ var order=['auto','light','dark']; cfg.mode = order[(order.indexOf(mode())+1)%3]; store.set('door.cfg',cfg); applyTheme(); });
+$('s-cancel').addEventListener('click', function(){ $('sheet').classList.remove('open'); });
+$('s-preset').addEventListener('change', function(){ var p=PRESETS[this.value]; if(!p) return; $('s-name').value=p[0]; $('s-lat').value=p[1]; $('s-lon').value=p[2]; });
+var stationReq=0;
+function loadStations(){        // 고른 시도의 측정소 목록을 에어코리아에서 받아 온다 (입력 칸의 키 사용)
+  var sido=$('s-sido').value, key=$('s-kma').value.replace(/\s+/g,''), sel=$('s-station'), msg=$('s-airmsg'), keep=sel.value||cfg.station||'', my=++stationReq;
+  if(!sido){ sel.innerHTML='<option value="">— 측정소 —</option>'; return; }
+  if(!key){ msg.textContent='먼저 위 칸에 인증키를 넣어 주세요.'; return; }
+  msg.textContent='측정소 목록을 불러오는 중…';
+  airkCall('getCtprvnRltmMesureDnsty', 'numOfRows=300&ver=1.3&sidoName='+encodeURIComponent(sido), key).then(function(items){
+    if(my!==stationReq) return;
+    var seen={}, list=[]; items.forEach(function(it){ var n=String(it.stationName||''); if(n && !seen[n]){ seen[n]=1; list.push({n:n, v:airkNum(it.pm25Value)}); } });
+    list.sort(function(a,b){ return a.n.localeCompare(b.n,'ko'); });
+    sel.innerHTML='<option value="">— 측정소 —</option>'+list.map(function(x){ return '<option value="'+esc(x.n)+'">'+esc(x.n)+(x.v==null?'':' · 초미세 '+Math.round(x.v))+'</option>'; }).join('');
+    if(keep && seen[keep]) sel.value=keep;
+    msg.textContent = !list.length ? '이 시도의 측정소 목록이 비어 있습니다.' : (sel.value && sel.value===cfg.station && key===kmaKeyVal() && airkState.msg) ? airkState.msg : sido+' 측정소 '+list.length+'곳 · 집에서 가까운 곳을 고르고 저장하세요.';
+  }).catch(function(e){ if(my===stationReq) msg.textContent = e&&e.kma==='key' ? '인증키가 맞지 않거나 에어코리아 활용신청이 아직 반영되지 않았습니다(1~2시간 걸릴 수 있음).' : '측정소 목록을 받지 못했습니다. 잠시 뒤 시도를 다시 골라 주세요.'; });
+}
+$('s-sido').addEventListener('change', function(){ $('s-station').innerHTML='<option value="">— 측정소 —</option>'; loadStations(); });
+$('s-kma').addEventListener('change', function(){ if($('s-sido').value) loadStations(); });
+$('s-custom').addEventListener('input', function(){ if(this.value.trim()) $('s-feed').value='custom'; });
+$('s-geo').addEventListener('click', function(){
+  var msg=$('s-geomsg');
+  if(!navigator.geolocation){ msg.textContent='이 브라우저에서는 위치를 가져올 수 없습니다. 위도·경도를 직접 넣어 주세요.'; return; }
+  msg.textContent='위치를 확인하는 중…';
+  navigator.geolocation.getCurrentPosition(function(pos){
+    $('s-lat').value=pos.coords.latitude.toFixed(4); $('s-lon').value=pos.coords.longitude.toFixed(4);
+    if(!$('s-name').value || PRESETS.some(function(p){ return p[0]===$('s-name').value; })) $('s-name').value='우리 집';
+    msg.textContent='현재 위치를 넣었습니다. 표시 이름을 확인하고 저장을 누르세요.';
+  }, function(){ msg.textContent='위치 권한이 없거나 확인에 실패했습니다. 목록에서 고르거나 위도·경도를 직접 넣어 주세요.'; }, {timeout:10000, maximumAge:600000});
+});
+$('s-save').addEventListener('click', function(){
+  var lat=parseFloat($('s-lat').value), lon=parseFloat($('s-lon').value);
+  if(!(lat>=-90&&lat<=90&&lon>=-180&&lon<=180)){ $('s-geomsg').textContent='위도·경도 값을 확인해 주세요. (예: 37.5665 / 126.9780)'; return; }
+  cfg.name=$('s-name').value.trim()||'우리 집'; cfg.lat=lat; cfg.lon=lon;
+  cfg.feed=$('s-feed').value; cfg.custom=$('s-custom').value.trim();
+  cfg.dim=$('s-dim').value==='1'?1:0; cfg.back=parseInt($('s-back').value,10)||0; cfg.mode=MODE_LABEL[$('s-theme').value]?$('s-theme').value:'auto';
+  var newKey=$('s-kma').value.replace(/\s+/g,'');
+  if(newKey!==(cfg.kmaKey||'')){ cfg.kmaKey=newKey; kmaState.mem={}; kmaState.msg=''; airkState.msg=''; delete cache.airk; }
+  var newStation=$('s-station').value||'', newSido=$('s-sido').value||'';
+  if(newStation!==(cfg.station||'')){ airkState.msg=''; delete cache.airk; }
+  cfg.station=newStation; cfg.sido=newStation?newSido:(cfg.sido&&!newSido?'':newSido);
+  store.set('door.cfg',cfg); applyTheme();
+  if($('s-design').value!==THIS_DESIGN){ switchDesign($('s-design').value); return; }
+  $('sheet').classList.remove('open');
+  $('where').textContent=cfg.name;
+  if(!cache.wx || cache.wx.key!==locKey()){ $('hero').className='card hero'; $('hero').innerHTML='<div class="empty">날씨를 불러오는 중…</div>'; $('hourly').innerHTML=''; $('daily').innerHTML=''; $('tips').innerHTML=''; tipCtx=null; }
+  if(!cache.news || cache.news.key!==feedUrl()) $('news').innerHTML='<div class="empty">뉴스를 불러오는 중…</div>';
+  if(mapOn){ mapOff(); syncMap(); }
+  nextAt.wx=0; nextAt.news=0; SAFE.renderDust(); SAFE.renderWeather(); SAFE.renderNews(); refresh();
+});
+
+/* ================= 새로고침: 화면을 아래로 당겼다 놓으면 최신 버전을 다시 받는다 ================= */
+var reloading=false;
+function hardReload(){
+  if(reloading) return; reloading=true;
+  var go2=function(){ location.reload(); }, tm=setTimeout(go2, 6000);
+  try{ fetch(location.pathname, {cache:'reload'}).catch(function(){}).then(function(){ clearTimeout(tm); go2(); }); }catch(e){ clearTimeout(tm); go2(); }
+}
+(function(){
+  var ptr=$('ptr'), start=null, pulled=0, NEED=130;
+  var show=function(dy){ ptr.classList.add('drag'); ptr.style.transform='translate(-50%,calc(-130% + '+Math.round(Math.min(dy,190)*0.95)+'px))'; ptr.textContent = dy>=NEED ? '놓으면 새로고침' : '아래로 당겨서 새로고침'; };
+  var hide=function(){ ptr.classList.remove('drag'); ptr.style.transform=''; };
+  window.addEventListener('touchstart', function(e){
+    start=null; pulled=0;
+    if(reloading || e.touches.length!==1 || $('sheet').classList.contains('open')) return;
+    start={x:e.touches[0].clientX, y:e.touches[0].clientY, ok:null};
+  }, {passive:true});
+  window.addEventListener('touchmove', function(e){
+    if(!start || e.touches.length!==1) return;
+    var dx=e.touches[0].clientX-start.x, dy=e.touches[0].clientY-start.y;
+    if(start.ok===null && (Math.abs(dx)>12 || Math.abs(dy)>12)) start.ok = dy>0 && Math.abs(dy)>Math.abs(dx)*1.5;      // 옆으로 넘기는 동작과 구분
+    if(!start.ok){ if(start.ok===false) hide(); return; }
+    pulled=Math.max(0,dy); if(pulled>30) show(pulled); else hide();
+  }, {passive:true});
+  var end=function(){
+    if(start && start.ok && pulled>=NEED){ ptr.classList.remove('drag'); ptr.style.transform='translate(-50%,calc(-130% + 150px))'; ptr.textContent='새로고침 중…'; hardReload(); }
+    else hide();
+    start=null; pulled=0;
+  };
+  window.addEventListener('touchend', end, {passive:true});
+  window.addEventListener('touchcancel', function(){ start=null; pulled=0; hide(); }, {passive:true});
+})();
+
+/* ================= 화면 꺼짐 방지(지원 기기) ================= */
+function keepAwake(){ try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').catch(function(){}); }catch(e){} }
+document.addEventListener('visibilitychange', function(){ syncMap(); if(!document.hidden){ keepAwake(); lastMin=-1; tick(); } });
+window.addEventListener('online', function(){ nextAt.wx=0; nextAt.fx=0; nextAt.news=0; refresh(); });
+window.addEventListener('pointerdown', keepAwake, {once:true});
+
+/* ================= 시작 ================= */
+applyTheme();
+// iPad/iPhone Safari 탭으로 열렸을 때(홈 화면 아이콘이 아닐 때)만 전체 화면 방법 안내
+if(window.navigator.standalone===false && !store.get('door.hint',0)) $('hint').classList.add('show');
+$('hint-x').addEventListener('click', function(){ $('hint').classList.remove('show'); store.set('door.hint',1); });
+$('where').textContent=cfg.name;
+SAFE.renderDust(); SAFE.renderWeather(); SAFE.renderFx(); SAFE.renderNews(); renderStatus();   // 저장된 마지막 값 먼저 표시
+keepAwake(); tick(); setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
